@@ -25,6 +25,8 @@ component WindowButton inherits Rectangle {
 
 export component TitleBar inherits Rectangle {
     in property <bool> maximized;
+    // Matches the window frame, so the header and the close button's hover stay inside it.
+    in property <length> corner-radius;
     callback start-drag();
     callback minimize();
     callback toggle-maximize();
@@ -32,6 +34,9 @@ export component TitleBar inherits Rectangle {
 
     height: 78px;
     background: Theme.header;
+    border-top-left-radius: root.corner-radius;
+    border-top-right-radius: root.corner-radius;
+    clip: true;
 
     // Dragging starts on the first move after a press so double-clicks still reach the TouchArea;
     // the flag resets before the drag because the OS move loop swallows the release.

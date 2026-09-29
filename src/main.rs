@@ -73,11 +73,14 @@ fn center_on_work_area(ui: &AppWindow) {
 fn native_frame(attributes: WindowAttributes) -> WindowAttributes {
     #[cfg(windows)]
     {
-        use slint::winit_030::winit::platform::windows::{Color, CornerPreference, WindowAttributesExtWindows};
+        use slint::winit_030::winit::platform::windows::{CornerPreference, WindowAttributesExtWindows};
         attributes
             .with_undecorated_shadow(true)
+            // DWM rounds the window with a hard, jagged clip on GPU-rendered windows. The app paints its
+            // own anti-aliased frame with a slightly larger radius inside a transparent window, so that
+            // clip only ever cuts pixels that are already transparent; DWM still rounds the shadow.
             .with_corner_preference(CornerPreference::Round)
-            .with_border_color(Some(Color::from_rgb(0xD9, 0xDE, 0xE8)))
+            .with_border_color(None)
     }
     #[cfg(not(windows))]
     attributes

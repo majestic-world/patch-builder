@@ -161,11 +161,21 @@ export component AppWindow inherits Window {
     preferred-height: self.initial-height;
     min-width: 1040px;
     min-height: 600px;
-    background: Theme.surface;
+    // Transparent so the rounded frame below owns the corners, anti-aliased by the renderer.
+    background: transparent;
     default-font-family: "Inter";
+
+    // Larger than the 8px DWM rounds the window with, so its un-anti-aliased clip stays outside this curve.
+    property <length> corner-radius: root.maximized ? 0 : 10px;
+
+    Rectangle {
+        background: Theme.surface;
+        border-radius: root.corner-radius;
+    }
 
     VerticalLayout {
         TitleBar {
+            corner-radius: root.corner-radius;
             maximized: root.maximized;
             start-drag => { root.start-drag(); }
             minimize => { root.minimized = true; }
@@ -251,6 +261,13 @@ export component AppWindow inherits Window {
                 }
             }
         }
+    }
+
+    // Drawn over the content so the header cannot hide it.
+    if !root.maximized: Rectangle {
+        border-radius: root.corner-radius;
+        border-width: 1px;
+        border-color: Theme.window-border;
     }
 
     // Borderless windows resize through these edge strips; hidden while maximized.
