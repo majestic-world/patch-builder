@@ -28,8 +28,16 @@ _Avoid_: build number, revision, patch level
 The published output of a Build: the Manifest plus every Archive, mirroring the Source layout, served as static files from any HTTP server or CDN.
 _Avoid_: patch, output folder
 
+**Scan**:
+Hashing every Source file and comparing it with the Update tree's current Manifest, without writing anything; it runs when the app opens, when a folder is chosen, and on Rescan.
+_Avoid_: analysis, check, verification
+
+**Plan**:
+The result of the last Scan, kept in memory: each Source file's status and the Archives to remove; what the next Build publishes.
+_Avoid_: diff, changeset, queue
+
 **Build**:
-One run of the Patch Builder that brings an Update tree in line with a Source, re-zipping only the Source files whose size or hash differ from the Update tree's current Manifest.
+Applying the Plan to the Update tree: re-zipping its New and Changed files, deleting the Archives of removed ones, and writing the Manifest.
 _Avoid_: patch, release, generation
 
 **Launcher**:

@@ -10,7 +10,7 @@ pub enum FileStatus {
     Unchanged,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ComparedFile {
     /// Path relative to the Source root, `/`-separated.
     pub path: String,

@@ -41,6 +41,14 @@ pub fn path_in(update_tree: &Path) -> PathBuf {
     update_tree.join(FILE_NAME)
 }
 
+/// Where the Archive of the Source file at `path` lives inside the Update tree.
+pub fn archive_path(update_tree: &Path, path: &str) -> PathBuf {
+    let mut archive = update_tree.to_owned();
+    archive.extend(path.split('/'));
+    archive.as_mut_os_string().push(ARCHIVE_SUFFIX);
+    archive
+}
+
 /// The Update tree's current Manifest, or `None` before its first Build.
 pub fn read(update_tree: &Path) -> Result<Option<Manifest>, ReadError> {
     let bytes = match fs::read(path_in(update_tree)) {

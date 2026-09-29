@@ -66,6 +66,56 @@ component BuildButton inherits Rectangle {
     }
 }
 
+// Secondary action next to Build; while a Scan runs it turns into the Scan's progress bar.
+component RescanButton inherits Rectangle {
+    in property <bool> enabled;
+    in property <bool> scanning;
+    in property <float> progress;
+    callback clicked();
+
+    height: 45px;
+    border-radius: 8px;
+    border-width: 1px;
+    clip: true;
+    border-color: touch.has-hover ? Theme.field-border-hover : Theme.field-border;
+    background: touch.pressed ? Theme.control-pressed : touch.has-hover ? Theme.row-hover : Theme.surface;
+
+    if root.scanning: Rectangle {
+        x: 0;
+        width: parent.width * clamp(root.progress, 0, 1);
+        background: Theme.indigo-fill;
+    }
+
+    touch := TouchArea {
+        enabled: root.enabled && !root.scanning;
+        mouse-cursor: self.enabled ? pointer : default;
+        clicked => { root.clicked(); }
+    }
+
+    HorizontalLayout {
+        alignment: center;
+        spacing: 10px;
+
+        if !root.scanning: VerticalLayout {
+            alignment: center;
+            Image {
+                width: 18px;
+                height: 18px;
+                source: @image-url("icons/refresh.svg");
+                colorize: root.enabled ? Theme.accent : Theme.unchanged-dot;
+            }
+        }
+
+        Text {
+            text: root.scanning ? "Scanning… \{Math.floor(root.progress * 100)}%" : "Rescan";
+            font-size: 15px;
+            font-weight: 600;
+            color: root.enabled || root.scanning ? Theme.ink : Theme.unchanged-dot;
+            vertical-alignment: center;
+        }
+    }
+}
+
 component ResizeHandle inherits TouchArea {
     in property <ResizeEdge> edge;
     callback start-resize(edge: ResizeEdge);
@@ -86,10 +136,15 @@ export component AppWindow inherits Window {
     in property <SummaryView> summary;
     in property <bool> building;
     in property <float> build-progress;
+    in property <bool> scanning;
+    in property <float> scan-progress;
+    // The last Scan found something to publish.
+    in property <bool> can-build;
 
     callback pick-source();
     callback pick-update-tree();
     callback build();
+    callback rescan();
     callback row-clicked(node: int);
     callback sort-clicked();
 
@@ -129,7 +184,7 @@ export component AppWindow inherits Window {
                     horizontal-stretch: 460;
                     preferred-width: 0;
                     min-width: 0;
-                    enabled: !root.building;
+                    enabled: !root.scanning && !root.building;
                     label: "Source";
                     path: root.source-path;
                     placeholder: "Choose the client folder…";
@@ -140,7 +195,7 @@ export component AppWindow inherits Window {
                     horizontal-stretch: 517;
                     preferred-width: 0;
                     min-width: 0;
-                    enabled: !root.building;
+                    enabled: !root.scanning && !root.building;
                     label: "Update tree";
                     path: root.update-tree-path;
                     placeholder: "Choose the publish folder…";
@@ -151,9 +206,22 @@ export component AppWindow inherits Window {
                     alignment: end;
                     horizontal-stretch: 0;
 
+                    RescanButton {
+                        width: 160px;
+                        enabled: root.source-path != "" && root.update-tree-path != "" && !root.building;
+                        scanning: root.scanning;
+                        progress: root.scan-progress;
+                        clicked => { root.rescan(); }
+                    }
+                }
+
+                VerticalLayout {
+                    alignment: end;
+                    horizontal-stretch: 0;
+
                     BuildButton {
                         width: 219px;
-                        enabled: root.source-path != "" && root.update-tree-path != "";
+                        enabled: root.can-build && !root.scanning;
                         building: root.building;
                         progress: root.build-progress;
                         clicked => { root.build(); }
@@ -169,6 +237,7 @@ export component AppWindow inherits Window {
                     rows: root.rows;
                     sort: root.sort;
                     has-comparison: root.has-comparison;
+                    scanning: root.scanning;
                     row-clicked(node) => { root.row-clicked(node); }
                     sort-clicked => { root.sort-clicked(); }
                 }

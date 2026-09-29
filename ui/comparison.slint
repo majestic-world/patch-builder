@@ -238,6 +238,8 @@ export component ComparisonCard inherits Rectangle {
     in property <NameSort> sort;
     // False until a comparison exists; the table then explains what is missing.
     in property <bool> has-comparison;
+    // A Scan is hashing the Source; the table fills in when it ends.
+    in property <bool> scanning;
     callback row-clicked(node: int);
     callback sort-clicked();
 
@@ -364,12 +366,12 @@ export component ComparisonCard inherits Rectangle {
 
                 Image {
                     height: 28px;
-                    source: @image-url("icons/file-text.svg");
+                    source: root.scanning ? @image-url("icons/refresh.svg") : @image-url("icons/file-text.svg");
                     colorize: Theme.unchanged-dot;
                 }
 
                 Text {
-                    text: "No comparison yet";
+                    text: root.scanning ? "Scanning the Source…" : "No comparison yet";
                     font-size: 14px;
                     font-weight: 600;
                     color: Theme.ink-soft;
@@ -377,7 +379,9 @@ export component ComparisonCard inherits Rectangle {
                 }
 
                 Text {
-                    text: "Choose a Source and an Update tree to compare their files.";
+                    text: root.scanning
+                        ? "Hashing every file to compare it with the Update tree's Manifest."
+                        : "Choose a Source and an Update tree to compare their files.";
                     font-size: 13px;
                     color: Theme.muted;
                     horizontal-alignment: center;
