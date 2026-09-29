@@ -2,7 +2,9 @@
 //! and Builds that apply the Plan kept in memory.
 
 use std::cell::RefCell;
-use std::path::PathBuf;
+use std::io;
+use std::path::{Path, PathBuf};
+use std::process::Command;
 use std::rc::Rc;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::Duration;
@@ -118,7 +120,11 @@ impl Session {
             match outcome {
                 Ok((plan, Ok(report))) => {
                     let note = build_note(&report);
+                    let update_tree = plan.update_tree.clone();
                     session.show(ui, plan.into_published(report.manifest), &note);
+                    if let Err(error) = open_folder(&update_tree) {
+                        show_error(ui, "Update tree not opened", &format!("{}: {error}", update_tree.display()));
+                    }
                 }
                 Ok((plan, Err(error))) => {
                     session.plan.replace(Some(plan));
@@ -225,6 +231,21 @@ fn pick_folder(ui: &AppWindow, title: &str, current: &str) -> Option<SharedStrin
     let folder = ui.window().with_winit_window(|window| dialog.set_parent(window).pick_folder()).flatten()?;
     // Shown with `/` separators, like Manifest paths; Windows accepts both.
     Some(folder.to_string_lossy().replace('\\', "/").into())
+}
+
+/// Shows `folder` in the system file manager without waiting for it.
+fn open_folder(folder: &Path) -> io::Result<()> {
+    // Rebuilding from components turns the `/` separators shown in the UI into native ones;
+    // Explorer ignores paths written with `/`.
+    let folder: PathBuf = folder.components().collect();
+    let program = if cfg!(windows) {
+        "explorer"
+    } else if cfg!(target_os = "macos") {
+        "open"
+    } else {
+        "xdg-open"
+    };
+    Command::new(program).arg(folder).spawn().map(drop)
 }
 
 pub fn show_error(ui: &AppWindow, title: &str, message: &str) {
