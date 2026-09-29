@@ -15,7 +15,10 @@ slint = { version = "1.18.1", features = ["unstable-winit-030"] }
 zip = { version = "8.6.0", default-features = false, features = ["deflate-flate2-zlib-rs"] }
 
 [build-dependencies]
+# Renders ui/icons/app-icon.svg into the .exe icon; the SVG only uses shapes and gradients.
+resvg = { version = "0.48", default-features = false }
 slint-build = "1.18.1"
+winresource = { version = "0.1.31", default-features = false }
 
 [dev-dependencies]
 tempfile = "3.27.0"
