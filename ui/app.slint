@@ -154,8 +154,11 @@ export component AppWindow inherits Window {
     title: "Patch Builder";
     icon: @image-url("icons/app-icon.svg");
     no-frame: true;
-    preferred-width: 1280px;
-    preferred-height: 681px;
+    // Opening size; Rust reads it to center the window before it is shown.
+    out property <length> initial-width: 1280px;
+    out property <length> initial-height: 831px;
+    preferred-width: self.initial-width;
+    preferred-height: self.initial-height;
     min-width: 1040px;
     min-height: 600px;
     background: Theme.surface;

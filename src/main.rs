@@ -38,9 +38,35 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Session::start(&ui, table);
     }
     install_window_chrome(&ui);
+    #[cfg(windows)]
+    center_on_work_area(&ui);
 
     ui.run()?;
     Ok(())
+}
+
+/// Places the window in the middle of the primary monitor's work area (the screen minus the taskbar).
+/// On failure the system's default placement stays.
+#[cfg(windows)]
+fn center_on_work_area(ui: &AppWindow) {
+    use windows_sys::Win32::Foundation::RECT;
+    use windows_sys::Win32::UI::HiDpi::GetDpiForSystem;
+    use windows_sys::Win32::UI::WindowsAndMessaging::{SPI_GETWORKAREA, SystemParametersInfoW};
+
+    let mut area = RECT { left: 0, top: 0, right: 0, bottom: 0 };
+    // SAFETY: SPI_GETWORKAREA writes exactly one RECT through the pointer, which outlives the call.
+    let found = unsafe { SystemParametersInfoW(SPI_GETWORKAREA, 0, (&raw mut area).cast(), 0) } != 0;
+    if !found {
+        return;
+    }
+    // The work area is in the process's DPI view; dividing by that DPI gives Slint's logical pixels.
+    // SAFETY: plain query without arguments.
+    let scale = unsafe { GetDpiForSystem() } as f32 / 96.0;
+    let (left, top) = (area.left as f32 / scale, area.top as f32 / scale);
+    let (width, height) = ((area.right - area.left) as f32 / scale, (area.bottom - area.top) as f32 / scale);
+    let x = left + ((width - ui.get_initial_width()) / 2.0).max(0.0);
+    let y = top + ((height - ui.get_initial_height()) / 2.0).max(0.0);
+    ui.window().set_position(slint::LogicalPosition::new(x, y));
 }
 
 /// Borderless window that keeps the system shadow and Windows 11 rounded corners.
