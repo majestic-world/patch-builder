@@ -5,6 +5,7 @@ export component PathField inherits VerticalLayout {
     in property <string> label;
     in property <string> path;
     in property <string> placeholder;
+    in property <bool> enabled: true;
     callback pick();
 
     spacing: 5px;
@@ -24,7 +25,8 @@ export component PathField inherits VerticalLayout {
         background: Theme.field;
 
         touch := TouchArea {
-            mouse-cursor: pointer;
+            enabled: root.enabled;
+            mouse-cursor: root.enabled ? pointer : default;
             clicked => { root.pick(); }
         }
 

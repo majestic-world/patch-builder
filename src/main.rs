@@ -1,13 +1,16 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod build;
 mod comparison;
 mod format;
+mod manifest;
 mod preview;
 mod tree;
 
 use std::cell::RefCell;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::rc::Rc;
+use std::sync::atomic::{AtomicU32, Ordering};
 
 use slint::winit_030::WinitWindowAccessor;
 use slint::winit_030::winit::window::{ResizeDirection, WindowAttributes};
@@ -35,7 +38,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     if std::env::args().skip(1).any(|arg| arg == "--preview") {
         ui.set_source_path(preview::SOURCE_PATH.into());
         ui.set_update_tree_path(preview::UPDATE_TREE_PATH.into());
-        let mut preview_tree = show_comparison(&ui, preview::files());
+        let mut preview_tree = show_comparison(&ui, preview::files(), SUMMARY_PROMPT);
         if let Some(id) = preview_tree.find(preview::SELECTED_PATH) {
             preview_tree.select(id);
         }
@@ -46,7 +49,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     refresh_rows(&ui, &rows, &tree);
 
     install_table(&ui, &rows, &tree);
-    install_folder_pickers(&ui);
+    install_folder_pickers(&ui, &rows, &tree);
+    install_build(&ui, &rows, &tree);
     install_window_chrome(&ui);
 
     ui.run()?;
@@ -67,10 +71,21 @@ fn native_frame(attributes: WindowAttributes) -> WindowAttributes {
     attributes
 }
 
-fn show_comparison(ui: &AppWindow, files: Vec<ComparedFile>) -> Tree {
-    ui.set_summary(summary_view(&Summary::of(&files)));
+/// Subtitle of the Build Summary before a Build has run.
+const SUMMARY_PROMPT: &str = "What will be published";
+
+fn show_comparison(ui: &AppWindow, files: Vec<ComparedFile>, note: &str) -> Tree {
+    ui.set_summary(summary_view(&Summary::of(&files), note));
     ui.set_has_comparison(true);
     Tree::from_files(files)
+}
+
+/// Drops a comparison that no longer matches the chosen folders.
+fn clear_comparison(ui: &AppWindow, rows: &VecModel<TreeRow>, tree: &SharedTree) {
+    *tree.borrow_mut() = None;
+    ui.set_has_comparison(false);
+    ui.set_summary(empty_summary());
+    refresh_rows(ui, rows, tree);
 }
 
 fn install_table(ui: &AppWindow, rows: &Rc<VecModel<TreeRow>>, tree: &SharedTree) {
@@ -140,8 +155,9 @@ fn tree_row(row: tree::Row<'_>) -> TreeRow {
     }
 }
 
-fn summary_view(summary: &Summary) -> SummaryView {
+fn summary_view(summary: &Summary, note: &str) -> SummaryView {
     SummaryView {
+        note: note.into(),
         manifest_count: format::count(summary.manifest_files).into(),
         manifest_unit: format::noun(summary.manifest_files, "file", "files").into(),
         manifest_size: format::bytes(summary.manifest_bytes).into(),
@@ -156,6 +172,7 @@ fn summary_view(summary: &Summary) -> SummaryView {
 /// Placeholder figures while no comparison exists.
 fn empty_summary() -> SummaryView {
     SummaryView {
+        note: SUMMARY_PROMPT.into(),
         manifest_count: "—".into(),
         rezip_count: "—".into(),
         reused_count: "—".into(),
@@ -163,25 +180,99 @@ fn empty_summary() -> SummaryView {
     }
 }
 
-fn install_folder_pickers(ui: &AppWindow) {
+/// Subtitle of the Build Summary after a Build: which Manifest Launchers now read.
+fn build_note(report: &build::Report) -> String {
+    let mut note = if report.manifest_written {
+        format!("Published as Manifest v{}", report.manifest_version)
+    } else {
+        format!("Already up to date · Manifest v{}", report.manifest_version)
+    };
+    if report.removed_archives > 0 {
+        let removed = report.removed_archives;
+        note.push_str(&format!(" · {} {} removed", format::count(removed), format::noun(removed, "Archive", "Archives")));
+    }
+    note
+}
+
+fn install_folder_pickers(ui: &AppWindow, rows: &Rc<VecModel<TreeRow>>, tree: &SharedTree) {
     ui.on_pick_source({
-        let ui = ui.as_weak();
+        let (ui, rows, tree) = (ui.as_weak(), rows.clone(), tree.clone());
         move || {
             let Some(ui) = ui.upgrade() else { return };
             if let Some(path) = pick_folder(&ui, "Choose the Source folder") {
                 ui.set_source_path(path);
+                clear_comparison(&ui, &rows, &tree);
             }
         }
     });
     ui.on_pick_update_tree({
-        let ui = ui.as_weak();
+        let (ui, rows, tree) = (ui.as_weak(), rows.clone(), tree.clone());
         move || {
             let Some(ui) = ui.upgrade() else { return };
             if let Some(path) = pick_folder(&ui, "Choose the Update tree folder") {
                 ui.set_update_tree_path(path);
+                clear_comparison(&ui, &rows, &tree);
             }
         }
     });
+}
+
+/// Runs the Build on a worker thread and shows its comparison once it finishes.
+fn install_build(ui: &AppWindow, rows: &Rc<VecModel<TreeRow>>, tree: &SharedTree) {
+    ui.on_build({
+        let (weak, rows, tree) = (ui.as_weak(), rows.clone(), tree.clone());
+        move || {
+            let Some(ui) = weak.upgrade() else { return };
+            let source = PathBuf::from(ui.get_source_path().as_str());
+            let update_tree = PathBuf::from(ui.get_update_tree_path().as_str());
+            ui.set_build_progress(0.0);
+            ui.set_building(true);
+
+            let (sender, receiver) = futures_channel::oneshot::channel();
+            let progress_ui = weak.clone();
+            std::thread::spawn(move || {
+                let reported = AtomicU32::new(0);
+                let result = build::run(&source, &update_tree, &|done, total| {
+                    // One UI update per whole percent keeps the event loop free on huge Sources.
+                    let percent = (done * 100).checked_div(total).map_or(100, |percent| percent as u32);
+                    if reported.fetch_max(percent, Ordering::Relaxed) < percent {
+                        let _ = progress_ui.upgrade_in_event_loop(move |ui| {
+                            // Workers may post out of order; progress only moves forward.
+                            ui.set_build_progress(ui.get_build_progress().max(percent as f32 / 100.0));
+                        });
+                    }
+                });
+                // The receiver only disappears when the app is closing.
+                let _ = sender.send(result);
+            });
+
+            let (weak, rows, tree) = (weak.clone(), rows.clone(), tree.clone());
+            slint::spawn_local(async move {
+                let result = receiver.await;
+                let Some(ui) = weak.upgrade() else { return };
+                ui.set_building(false);
+                match result {
+                    Ok(Ok(report)) => {
+                        let note = build_note(&report);
+                        *tree.borrow_mut() = Some(show_comparison(&ui, report.files, &note));
+                        refresh_rows(&ui, &rows, &tree);
+                    }
+                    Ok(Err(error)) => show_error(&ui, &error.to_string()),
+                    Err(_) => show_error(&ui, "The Build stopped unexpectedly."),
+                }
+            })
+            .expect("callbacks run inside the Slint event loop");
+        }
+    });
+}
+
+fn show_error(ui: &AppWindow, message: &str) {
+    let dialog = rfd::MessageDialog::new()
+        .set_level(rfd::MessageLevel::Error)
+        .set_title("Build failed")
+        .set_description(message)
+        .set_buttons(rfd::MessageButtons::Ok);
+    ui.window().with_winit_window(|window| dialog.set_parent(window).show());
 }
 
 /// Native folder dialog, modal to the app window; `None` when cancelled.

@@ -16,18 +16,29 @@ export enum ResizeEdge { north, south, east, west, north-east, north-west, south
 
 component BuildButton inherits Rectangle {
     in property <bool> enabled;
+    // While a Build runs the button turns into its progress bar.
+    in property <bool> building;
+    in property <float> progress;
     callback clicked();
 
     height: 45px;
     border-radius: 8px;
-    background: !root.enabled ? Theme.accent-disabled
+    clip: true;
+    background: root.building ? Theme.accent
+        : !root.enabled ? Theme.accent-disabled
         : touch.pressed ? Theme.accent-pressed
         : touch.has-hover ? Theme.accent-hover
         : Theme.accent;
 
+    if root.building: Rectangle {
+        x: 0;
+        width: parent.width * clamp(root.progress, 0, 1);
+        background: #FFFFFF2E;
+    }
+
     touch := TouchArea {
-        enabled: root.enabled;
-        mouse-cursor: root.enabled ? pointer : default;
+        enabled: root.enabled && !root.building;
+        mouse-cursor: self.enabled ? pointer : default;
         clicked => { root.clicked(); }
     }
 
@@ -35,7 +46,7 @@ component BuildButton inherits Rectangle {
         alignment: center;
         spacing: 12px;
 
-        VerticalLayout {
+        if !root.building: VerticalLayout {
             alignment: center;
             Image {
                 width: 20px;
@@ -46,7 +57,7 @@ component BuildButton inherits Rectangle {
         }
 
         Text {
-            text: "Build";
+            text: root.building ? "Building… \{Math.floor(root.progress * 100)}%" : "Build";
             font-size: 15px;
             font-weight: 600;
             color: #FFFFFF;
@@ -73,6 +84,8 @@ export component AppWindow inherits Window {
     in property <NameSort> sort;
     in property <bool> has-comparison;
     in property <SummaryView> summary;
+    in property <bool> building;
+    in property <float> build-progress;
 
     callback pick-source();
     callback pick-update-tree();
@@ -116,6 +129,7 @@ export component AppWindow inherits Window {
                     horizontal-stretch: 460;
                     preferred-width: 0;
                     min-width: 0;
+                    enabled: !root.building;
                     label: "Source";
                     path: root.source-path;
                     placeholder: "Choose the client folder…";
@@ -126,6 +140,7 @@ export component AppWindow inherits Window {
                     horizontal-stretch: 517;
                     preferred-width: 0;
                     min-width: 0;
+                    enabled: !root.building;
                     label: "Update tree";
                     path: root.update-tree-path;
                     placeholder: "Choose the publish folder…";
@@ -139,6 +154,8 @@ export component AppWindow inherits Window {
                     BuildButton {
                         width: 219px;
                         enabled: root.source-path != "" && root.update-tree-path != "";
+                        building: root.building;
+                        progress: root.build-progress;
                         clicked => { root.build(); }
                     }
                 }

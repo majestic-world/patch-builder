@@ -4,7 +4,7 @@
 pub enum FileStatus {
     /// Absent from the previous Manifest.
     New,
-    /// Present in the previous Manifest with a different size or hash.
+    /// Present in the previous Manifest with a different size or hash, or with its Archive missing.
     Changed,
     /// Identical to the previous Manifest entry; its Archive is reused.
     Unchanged,

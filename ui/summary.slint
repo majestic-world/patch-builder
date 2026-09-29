@@ -1,7 +1,8 @@
 import { Theme } from "theme.slint";
 
-// Preformatted figures; an empty `*-size` hides that line.
+// Preformatted figures; an empty `*-size` hides that line. `note` is the header subtitle.
 export struct SummaryView {
+    note: string,
     manifest-count: string,
     manifest-unit: string,
     manifest-size: string,
@@ -119,7 +120,9 @@ export component BuildSummary inherits Rectangle {
     Text {
         x: 83px;
         y: 54.1px - self.height / 2;
-        text: "What will be published";
+        width: parent.width - self.x - 17px;
+        text: root.summary.note;
+        overflow: elide;
         font-size: 12.25px;
         color: Theme.muted;
     }

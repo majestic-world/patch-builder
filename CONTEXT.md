@@ -20,12 +20,16 @@ _Avoid_: zip, package, patch file
 The JSON document listing every Source file of the current Source with its size and hash, both taken from the uncompressed Source file; the single entry point a Launcher reads.
 _Avoid_: hash file, hash list, index
 
+**Manifest version**:
+A number in the Manifest that grows by one whenever its file list changes; a Launcher that already installed that version has nothing to download.
+_Avoid_: build number, revision, patch level
+
 **Update tree**:
 The published output of a Build: the Manifest plus every Archive, mirroring the Source layout, served as static files from any HTTP server or CDN.
 _Avoid_: patch, output folder
 
 **Build**:
-One run of the Patch Builder that turns a Source into an Update tree, reusing the previous Update tree's Archives for Source files whose size and hash are unchanged.
+One run of the Patch Builder that brings an Update tree in line with a Source, re-zipping only the Source files whose size or hash differ from the Update tree's current Manifest.
 _Avoid_: patch, release, generation
 
 **Launcher**:
