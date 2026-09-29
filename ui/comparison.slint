@@ -1,5 +1,6 @@
 import { ListView } from "std-widgets.slint";
 import { Theme } from "theme.slint";
+import { ScrollBar } from "scroll-bar.slint";
 
 export enum RowStatus { new, changed, unchanged }
 
@@ -349,13 +350,34 @@ export component ComparisonCard inherits Rectangle {
             }
         }
 
-        if root.has-comparison: ListView {
-            for row in root.rows: TreeRowView {
-                entry: row;
-                status-x: root.status-x;
-                size-x: root.size-x;
-                hash-x: root.hash-x;
-                clicked => { root.row-clicked(row.node); }
+        if root.has-comparison: body := Rectangle {
+            // The style's own scrollbar only shows on hover and follows the OS dark theme.
+            property <bool> scrollable: list.content-height > list.visible-height;
+
+            list := ListView {
+                x: 0;
+                y: 0;
+                width: parent.width - (parent.scrollable ? 18px : 0px);
+                height: parent.height;
+                vertical-scrollbar-policy: ScrollBarPolicy.always-off;
+                horizontal-scrollbar-policy: ScrollBarPolicy.always-off;
+
+                for row in root.rows: TreeRowView {
+                    entry: row;
+                    status-x: root.status-x;
+                    size-x: root.size-x;
+                    hash-x: root.hash-x;
+                    clicked => { root.row-clicked(row.node); }
+                }
+            }
+
+            if body.scrollable: ScrollBar {
+                x: parent.width - self.width - 6px;
+                y: 6px;
+                height: parent.height - 12px;
+                content-y <=> list.content-y;
+                content-height: list.content-height;
+                visible-height: list.visible-height;
             }
         }
 
