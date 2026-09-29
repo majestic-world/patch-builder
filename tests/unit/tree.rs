@@ -1,7 +1,12 @@
 use super::*;
 
+/// A New file, so every folder above it starts expanded.
 fn file(path: &str) -> ComparedFile {
-    ComparedFile { path: path.to_owned(), status: FileStatus::Unchanged, size: 1, hash: String::new() }
+    ComparedFile { path: path.to_owned(), status: FileStatus::New, size: 1, hash: String::new() }
+}
+
+fn file_with(path: &str, status: FileStatus) -> ComparedFile {
+    ComparedFile { status, ..file(path) }
 }
 
 fn tree(paths: &[&str]) -> Tree {
@@ -10,6 +15,19 @@ fn tree(paths: &[&str]) -> Tree {
 
 fn names(tree: &Tree) -> Vec<&str> {
     tree.rows().into_iter().map(|row| row.name).collect()
+}
+
+#[test]
+fn only_folders_with_new_or_changed_files_start_expanded() {
+    let tree = Tree::from_files(vec![
+        file_with("Animations/a.ukx", FileStatus::Unchanged),
+        file_with("system/data/new.dat", FileStatus::New),
+        file_with("system/data/same.dat", FileStatus::Unchanged),
+        file_with("system/fonts/f.utx", FileStatus::Unchanged),
+        file_with("maps/23_21.unr", FileStatus::Changed),
+    ]);
+    // `system` opens down to the New file; its all-Unchanged `fonts` stays collapsed.
+    assert_eq!(names(&tree), ["Animations", "system", "data", "new.dat", "same.dat", "fonts", "maps", "23_21.unr"]);
 }
 
 #[test]

@@ -64,7 +64,7 @@ pub struct Row<'a> {
 }
 
 impl Tree {
-    /// Builds the tree with every folder expanded, keeping the Source order.
+    /// Builds the tree in Source order; only folders holding a New or Changed file start expanded.
     pub fn from_files(files: Vec<ComparedFile>) -> Self {
         let mut tree = Self { nodes: Vec::new(), roots: Vec::new(), sort: SortOrder::Source, selected: None };
         let mut folders: HashMap<Option<NodeId>, HashMap<String, NodeId>> = HashMap::new();
@@ -82,7 +82,7 @@ impl Tree {
                 parent = Some(match siblings.get(name) {
                     Some(&id) => id,
                     None => {
-                        let kind = NodeKind::Folder { children: Vec::new(), expanded: true };
+                        let kind = NodeKind::Folder { children: Vec::new(), expanded: false };
                         let id = tree.push_node(parent, name.to_owned(), kind);
                         siblings.insert(name.to_owned(), id);
                         id
@@ -90,7 +90,24 @@ impl Tree {
                 });
             }
         }
+        tree.expand_changed_folders();
         tree
+    }
+
+    /// Expands every folder with a New or Changed file somewhere below it.
+    fn expand_changed_folders(&mut self) {
+        let mut changed = vec![false; self.nodes.len()];
+        // Children always get larger ids than their parent, so walking ids backwards settles
+        // every child before the folder that holds it.
+        for id in (0..self.nodes.len()).rev() {
+            changed[id] = match &self.nodes[id].kind {
+                NodeKind::File { status, .. } => *status != FileStatus::Unchanged,
+                NodeKind::Folder { children, .. } => children.iter().any(|&child| changed[child]),
+            };
+            if let NodeKind::Folder { expanded, .. } = &mut self.nodes[id].kind {
+                *expanded = changed[id];
+            }
+        }
     }
 
     fn push_node(&mut self, parent: Option<NodeId>, name: String, kind: NodeKind) -> NodeId {
