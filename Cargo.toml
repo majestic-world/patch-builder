@@ -18,3 +18,12 @@ slint-build = "1.18.1"
 
 [dev-dependencies]
 tempfile = "3.27.0"
+
+# Speed over binary size and build time. No `target-cpu=native`: BLAKE3 and zlib-rs already
+# pick SIMD at runtime, and the binary must still run on other publishers' machines.
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+incremental = false
+debug = false
