@@ -1,0 +1,164 @@
+import { Theme } from "theme.slint";
+
+// Preformatted figures; an empty `*-size` hides that line.
+export struct SummaryView {
+    manifest-count: string,
+    manifest-unit: string,
+    manifest-size: string,
+    rezip-count: string,
+    rezip-unit: string,
+    rezip-size: string,
+    reused-count: string,
+    reused-unit: string,
+}
+
+component StatCard inherits Rectangle {
+    in property <image> icon;
+    in property <color> icon-color;
+    in property <color> badge;
+    in property <string> label;
+    in property <string> value;
+    in property <string> unit;
+    in property <string> detail;
+
+    height: root.detail == "" ? 99px : 114px;
+    background: Theme.surface;
+    border-radius: 10px;
+    border-width: 1px;
+    border-color: #EDF0F6;
+    drop-shadow-blur: 4px;
+    drop-shadow-offset-y: 1px;
+    drop-shadow-color: #1A23500A;
+
+    Rectangle {
+        x: 16px;
+        y: 14px;
+        width: 50px;
+        height: 50px;
+        border-radius: self.width / 2;
+        background: root.badge;
+
+        Image {
+            width: 24px;
+            height: 24px;
+            source: root.icon;
+            colorize: root.icon-color;
+        }
+    }
+
+    Text {
+        x: 86px;
+        y: 26.8px - self.height / 2;
+        text: root.label;
+        font-size: 11.75px;
+        font-weight: 500;
+        color: Theme.ink-soft;
+    }
+
+    value := Text {
+        x: 86px;
+        y: 54.1px - self.height / 2;
+        text: root.value;
+        font-size: 23px;
+        letter-spacing: -0.5px;
+        font-weight: 700;
+        color: Theme.ink;
+    }
+
+    // Shares the value's baseline: both boxes end at their font's descender (0.242 em for Inter).
+    Text {
+        x: value.x + value.width + 8px;
+        y: value.y + value.height - self.height - (23px - 13.5px) * 0.242;
+        text: root.unit;
+        font-size: 13.5px;
+        color: Theme.muted;
+    }
+
+    if root.detail != "": Text {
+        x: 86px;
+        y: 88px - self.height / 2;
+        text: root.detail;
+        font-size: 14.5px;
+        color: Theme.muted;
+    }
+}
+
+export component BuildSummary inherits Rectangle {
+    in property <SummaryView> summary;
+
+    background: Theme.summary;
+    border-radius: 12px;
+    border-width: 1px;
+    border-color: Theme.border;
+
+    Rectangle {
+        x: 18px;
+        y: 19px;
+        width: 48px;
+        height: 48px;
+        border-radius: self.width / 2;
+        background: Theme.indigo-fill;
+
+        Image {
+            width: 24px;
+            height: 24px;
+            source: @image-url("icons/layers.svg");
+            colorize: Theme.indigo-icon;
+        }
+    }
+
+    Text {
+        x: 83px;
+        y: 31.1px - self.height / 2;
+        text: "Build Summary";
+        font-size: 15.5px;
+        font-weight: 700;
+        color: Theme.ink;
+    }
+
+    Text {
+        x: 83px;
+        y: 54.1px - self.height / 2;
+        text: "What will be published";
+        font-size: 12.25px;
+        color: Theme.muted;
+    }
+
+    VerticalLayout {
+        x: 17px;
+        y: 85px;
+        width: parent.width - 2 * self.x;
+        height: parent.height - self.y - 17px;
+        spacing: 15px;
+        alignment: start;
+
+        StatCard {
+            icon: @image-url("icons/file-text.svg");
+            icon-color: Theme.indigo-icon;
+            badge: Theme.indigo-fill;
+            label: "Manifest";
+            value: root.summary.manifest-count;
+            unit: root.summary.manifest-unit;
+            detail: root.summary.manifest-size;
+        }
+
+        StatCard {
+            icon: @image-url("icons/zip.svg");
+            icon-color: Theme.green-icon;
+            badge: Theme.green-fill;
+            label: "To re-zip";
+            value: root.summary.rezip-count;
+            unit: root.summary.rezip-unit;
+            detail: root.summary.rezip-size;
+        }
+
+        StatCard {
+            icon: @image-url("icons/refresh.svg");
+            icon-color: Theme.gray-icon;
+            badge: Theme.gray-fill;
+            label: "Reused";
+            value: root.summary.reused-count;
+            unit: root.summary.reused-unit;
+        }
+    }
+}

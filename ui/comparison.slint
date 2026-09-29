@@ -1,0 +1,388 @@
+import { ListView } from "std-widgets.slint";
+import { Theme } from "theme.slint";
+
+export enum RowStatus { new, changed, unchanged }
+
+export enum NameSort { source, ascending, descending }
+
+export struct TreeRow {
+    node: int,
+    name: string,
+    depth: int,
+    is-folder: bool,
+    expanded: bool,
+    // Meaningful for file rows only.
+    status: RowStatus,
+    size: string,
+    hash: string,
+    // Last child of its parent: the connector stops at the row's middle.
+    is-last: bool,
+    // One entry per ancestor level 1..depth: whether that level's guide line runs through this row.
+    guides: [bool],
+    selected: bool,
+}
+
+component StatusDot inherits Rectangle {
+    in property <RowStatus> status;
+    // Pills use a darker gray so the dot reads against the gray fill.
+    in property <color> unchanged-color: Theme.unchanged-dot;
+
+    width: 9px;
+    height: 9px;
+    border-radius: self.width / 2;
+    background: root.status == RowStatus.new ? Theme.new-dot
+        : root.status == RowStatus.changed ? Theme.changed-dot
+        : root.unchanged-color;
+}
+
+global StatusText {
+    public pure function label(status: RowStatus) -> string {
+        return status == RowStatus.new ? "New" : status == RowStatus.changed ? "Changed" : "Unchanged";
+    }
+}
+
+component StatusPill inherits Rectangle {
+    in property <RowStatus> status;
+
+    width: content.preferred-width;
+    height: 25px;
+    border-radius: self.height / 2;
+    background: root.status == RowStatus.new ? Theme.new-fill
+        : root.status == RowStatus.changed ? Theme.changed-fill
+        : Theme.unchanged-fill;
+
+    content := HorizontalLayout {
+        padding-left: 12px;
+        padding-right: 13px;
+        spacing: 8px;
+        alignment: start;
+
+        VerticalLayout {
+            alignment: center;
+            StatusDot {
+                status: root.status;
+                unchanged-color: Theme.unchanged-pill-dot;
+                width: 7px;
+                height: 7px;
+            }
+        }
+
+        Text {
+            text: StatusText.label(root.status);
+            font-size: 10.75px;
+            font-weight: 600;
+            vertical-alignment: center;
+            color: root.status == RowStatus.new ? Theme.new-text
+                : root.status == RowStatus.changed ? Theme.changed-text
+                : Theme.unchanged-text;
+        }
+    }
+}
+
+component LegendItem inherits HorizontalLayout {
+    in property <RowStatus> status;
+
+    spacing: 12px;
+
+    VerticalLayout {
+        alignment: center;
+        StatusDot {
+            status: root.status;
+        }
+    }
+
+    Text {
+        text: StatusText.label(root.status);
+        font-size: 10.75px;
+        color: Theme.ink-soft;
+        vertical-alignment: center;
+    }
+}
+
+component TreeRowView inherits Rectangle {
+    in property <TreeRow> entry;
+    in property <length> status-x;
+    in property <length> size-x;
+    in property <length> hash-x;
+    callback clicked();
+
+    // Horizontal step per depth level; the connector of a depth-d row sits under its parent's icon.
+    property <length> indent: 36px;
+    property <length> offset: root.entry.depth * root.indent;
+    property <length> connector-x: 24px + root.offset;
+    property <length> middle: root.height / 2;
+
+    height: 45px;
+    background: root.entry.selected ? Theme.row-selected : touch.has-hover ? Theme.row-hover : transparent;
+
+    touch := TouchArea {
+        mouse-cursor: pointer;
+        clicked => { root.clicked(); }
+    }
+
+    for continues[level] in root.entry.guides: Rectangle {
+        x: 60px + level * root.indent;
+        y: 0;
+        width: 1px;
+        height: root.height;
+        background: continues ? Theme.guide : transparent;
+    }
+
+    if root.entry.depth > 0 && !root.entry.is-folder: Rectangle {
+        x: root.connector-x;
+        y: 0;
+        width: 1px;
+        height: root.entry.is-last ? root.middle : root.height;
+        background: Theme.guide;
+    }
+
+    if root.entry.depth > 0 && !root.entry.is-folder: Rectangle {
+        x: root.connector-x;
+        y: root.middle;
+        width: 11px;
+        height: 1px;
+        background: Theme.guide;
+    }
+
+    // A nested folder's chevron sits on its parent's guide line, which parts around it.
+    if root.entry.depth > 0 && root.entry.is-folder: Rectangle {
+        x: root.connector-x;
+        y: 0;
+        width: 1px;
+        height: root.middle - 9px;
+        background: Theme.guide;
+    }
+
+    if root.entry.depth > 0 && root.entry.is-folder && !root.entry.is-last: Rectangle {
+        x: root.connector-x;
+        y: root.middle + 9px;
+        width: 1px;
+        height: root.middle - 9px;
+        background: Theme.guide;
+    }
+
+    if root.entry.is-folder: Image {
+        x: 18px + root.offset;
+        y: root.middle - self.height / 2;
+        width: 14px;
+        height: 14px;
+        source: root.entry.expanded ? @image-url("icons/chevron-down.svg") : @image-url("icons/chevron-right.svg");
+        colorize: Theme.icon;
+    }
+
+    if root.entry.is-folder: Image {
+        x: 50.5px + root.offset;
+        y: root.middle - self.height / 2;
+        width: 21px;
+        height: 21px;
+        source: @image-url("icons/folder-filled.svg");
+    }
+
+    if !root.entry.is-folder: Image {
+        x: 51px + root.offset;
+        y: root.middle - self.height / 2;
+        width: 20px;
+        height: 20px;
+        source: @image-url("icons/file.svg");
+        colorize: Theme.icon;
+    }
+
+    Text {
+        x: 90px + root.offset;
+        width: root.status-x - self.x - 12px;
+        height: root.height;
+        text: root.entry.name;
+        font-size: 12.5px;
+        font-weight: root.entry.is-folder ? 600 : 400;
+        color: root.entry.is-folder ? Theme.ink : Theme.ink-soft;
+        vertical-alignment: center;
+        overflow: elide;
+    }
+
+    if !root.entry.is-folder: StatusPill {
+        x: root.status-x;
+        y: root.middle - self.height / 2;
+        status: root.entry.status;
+    }
+
+    if !root.entry.is-folder: Text {
+        x: root.size-x;
+        height: root.height;
+        text: root.entry.size;
+        font-size: 12.75px;
+        color: Theme.ink-data;
+        vertical-alignment: center;
+    }
+
+    if !root.entry.is-folder: Text {
+        x: root.hash-x;
+        width: root.width - self.x - 12px;
+        height: root.height;
+        text: root.entry.hash;
+        font-family: "JetBrains Mono";
+        font-size: 11.75px;
+        color: Theme.ink-data;
+        vertical-alignment: center;
+        overflow: elide;
+    }
+}
+
+component ColumnLabel inherits Text {
+    font-size: 12.25px;
+    color: Theme.muted;
+    vertical-alignment: center;
+}
+
+export component ComparisonCard inherits Rectangle {
+    in property <[TreeRow]> rows;
+    in property <NameSort> sort;
+    // False until a comparison exists; the table then explains what is missing.
+    in property <bool> has-comparison;
+    callback row-clicked(node: int);
+    callback sort-clicked();
+
+    // Column starts, measured from the card's left edge; File takes the remaining width.
+    property <length> hash-x: root.width - 197px;
+    property <length> size-x: root.hash-x - 131px;
+    property <length> status-x: root.size-x - 140px;
+
+    background: Theme.surface;
+    border-radius: 10px;
+    border-width: 1px;
+    border-color: Theme.border;
+    clip: true;
+
+    VerticalLayout {
+        Rectangle {
+            height: 70px;
+            background: Theme.table-header;
+
+            Text {
+                x: 18px;
+                y: 25.4px - self.height / 2;
+                text: "Source vs. Previous Build";
+                font-size: 14.5px;
+                font-weight: 700;
+                color: Theme.ink;
+            }
+
+            Text {
+                x: 18px;
+                y: 47.2px - self.height / 2;
+                text: "Compare files from source with the last published build";
+                font-size: 12px;
+                color: Theme.muted;
+            }
+
+            HorizontalLayout {
+                x: parent.width - self.width - 18px;
+                y: 34px - self.height / 2;
+                width: self.preferred-width;
+                height: 20px;
+                spacing: 27px;
+
+                LegendItem {
+                    status: RowStatus.new;
+                }
+
+                LegendItem {
+                    status: RowStatus.changed;
+                }
+
+                LegendItem {
+                    status: RowStatus.unchanged;
+                }
+            }
+        }
+
+        Rectangle {
+            height: 1px;
+            background: Theme.border;
+        }
+
+        Rectangle {
+            height: 47px;
+            background: Theme.table-header;
+
+            sort-touch := TouchArea {
+                x: 0;
+                width: root.status-x - 12px;
+                mouse-cursor: pointer;
+                clicked => { root.sort-clicked(); }
+            }
+
+            file-label := ColumnLabel {
+                x: 18px;
+                height: parent.height;
+                text: "File";
+                color: sort-touch.has-hover ? Theme.ink-soft : Theme.muted;
+            }
+
+            Image {
+                x: file-label.x + file-label.width + 9px;
+                width: 13px;
+                height: 13px;
+                source: root.sort == NameSort.ascending ? @image-url("icons/chevron-up.svg")
+                    : root.sort == NameSort.descending ? @image-url("icons/chevron-down.svg")
+                    : @image-url("icons/chevrons-up-down.svg");
+                colorize: root.sort == NameSort.source ? Theme.icon : Theme.accent;
+            }
+
+            ColumnLabel {
+                x: root.status-x;
+                height: parent.height;
+                text: "Status";
+            }
+
+            ColumnLabel {
+                x: root.size-x;
+                height: parent.height;
+                text: "Size (source)";
+            }
+
+            ColumnLabel {
+                x: root.hash-x;
+                height: parent.height;
+                text: "Hash (source)";
+            }
+        }
+
+        if root.has-comparison: ListView {
+            for row in root.rows: TreeRowView {
+                entry: row;
+                status-x: root.status-x;
+                size-x: root.size-x;
+                hash-x: root.hash-x;
+                clicked => { root.row-clicked(row.node); }
+            }
+        }
+
+        if !root.has-comparison: Rectangle {
+            VerticalLayout {
+                alignment: center;
+                spacing: 6px;
+
+                Image {
+                    height: 28px;
+                    source: @image-url("icons/file-text.svg");
+                    colorize: Theme.unchanged-dot;
+                }
+
+                Text {
+                    text: "No comparison yet";
+                    font-size: 14px;
+                    font-weight: 600;
+                    color: Theme.ink-soft;
+                    horizontal-alignment: center;
+                }
+
+                Text {
+                    text: "Choose a Source and an Update tree to compare their files.";
+                    font-size: 13px;
+                    color: Theme.muted;
+                    horizontal-alignment: center;
+                }
+            }
+        }
+    }
+}

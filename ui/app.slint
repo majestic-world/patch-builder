@@ -1,0 +1,241 @@
+import "fonts/Inter-Regular.ttf";
+import "fonts/Inter-Medium.ttf";
+import "fonts/Inter-SemiBold.ttf";
+import "fonts/Inter-Bold.ttf";
+import "fonts/JetBrainsMono-Regular.ttf";
+
+import { Theme } from "theme.slint";
+import { TitleBar } from "title-bar.slint";
+import { PathField } from "path-field.slint";
+import { ComparisonCard, TreeRow, RowStatus, NameSort } from "comparison.slint";
+import { BuildSummary, SummaryView } from "summary.slint";
+
+export { TreeRow, RowStatus, NameSort, SummaryView }
+
+export enum ResizeEdge { north, south, east, west, north-east, north-west, south-east, south-west }
+
+component BuildButton inherits Rectangle {
+    in property <bool> enabled;
+    callback clicked();
+
+    height: 45px;
+    border-radius: 8px;
+    background: !root.enabled ? Theme.accent-disabled
+        : touch.pressed ? Theme.accent-pressed
+        : touch.has-hover ? Theme.accent-hover
+        : Theme.accent;
+
+    touch := TouchArea {
+        enabled: root.enabled;
+        mouse-cursor: root.enabled ? pointer : default;
+        clicked => { root.clicked(); }
+    }
+
+    HorizontalLayout {
+        alignment: center;
+        spacing: 12px;
+
+        VerticalLayout {
+            alignment: center;
+            Image {
+                width: 20px;
+                height: 20px;
+                source: @image-url("icons/play.svg");
+                colorize: #FFFFFF;
+            }
+        }
+
+        Text {
+            text: "Build";
+            font-size: 15px;
+            font-weight: 600;
+            color: #FFFFFF;
+            vertical-alignment: center;
+        }
+    }
+}
+
+component ResizeHandle inherits TouchArea {
+    in property <ResizeEdge> edge;
+    callback start-resize(edge: ResizeEdge);
+
+    pointer-event(event) => {
+        if (event.kind == PointerEventKind.down && event.button == PointerEventButton.left) {
+            root.start-resize(root.edge);
+        }
+    }
+}
+
+export component AppWindow inherits Window {
+    in property <string> source-path;
+    in property <string> update-tree-path;
+    in property <[TreeRow]> rows;
+    in property <NameSort> sort;
+    in property <bool> has-comparison;
+    in property <SummaryView> summary;
+
+    callback pick-source();
+    callback pick-update-tree();
+    callback build();
+    callback row-clicked(node: int);
+    callback sort-clicked();
+
+    callback start-drag();
+    callback start-resize(edge: ResizeEdge);
+
+    title: "Patch Builder";
+    icon: @image-url("icons/app-icon.svg");
+    no-frame: true;
+    preferred-width: 1280px;
+    preferred-height: 681px;
+    min-width: 1040px;
+    min-height: 600px;
+    background: Theme.surface;
+    default-font-family: "Inter";
+
+    VerticalLayout {
+        TitleBar {
+            maximized: root.maximized;
+            start-drag => { root.start-drag(); }
+            minimize => { root.minimized = true; }
+            toggle-maximize => { root.maximized = !root.maximized; }
+            close => { root.close(); }
+        }
+
+        VerticalLayout {
+            padding: 21px;
+            padding-top: 20px;
+            spacing: 27px;
+
+            HorizontalLayout {
+                spacing: 21px;
+
+                // Zero preferred widths make the split follow the stretch ratio alone,
+                // so picking a longer path never shifts the fields.
+                PathField {
+                    horizontal-stretch: 460;
+                    preferred-width: 0;
+                    min-width: 0;
+                    label: "Source";
+                    path: root.source-path;
+                    placeholder: "Choose the client folder…";
+                    pick => { root.pick-source(); }
+                }
+
+                PathField {
+                    horizontal-stretch: 517;
+                    preferred-width: 0;
+                    min-width: 0;
+                    label: "Update tree";
+                    path: root.update-tree-path;
+                    placeholder: "Choose the publish folder…";
+                    pick => { root.pick-update-tree(); }
+                }
+
+                VerticalLayout {
+                    alignment: end;
+                    horizontal-stretch: 0;
+
+                    BuildButton {
+                        width: 219px;
+                        enabled: root.source-path != "" && root.update-tree-path != "";
+                        clicked => { root.build(); }
+                    }
+                }
+            }
+
+            HorizontalLayout {
+                spacing: 21px;
+                vertical-stretch: 1;
+
+                ComparisonCard {
+                    rows: root.rows;
+                    sort: root.sort;
+                    has-comparison: root.has-comparison;
+                    row-clicked(node) => { root.row-clicked(node); }
+                    sort-clicked => { root.sort-clicked(); }
+                }
+
+                BuildSummary {
+                    width: 321px;
+                    summary: root.summary;
+                }
+            }
+        }
+    }
+
+    // Borderless windows resize through these edge strips; hidden while maximized.
+    property <length> grip: 5px;
+    if !root.maximized: ResizeHandle {
+        x: root.grip;
+        y: 0;
+        width: root.width - 2 * root.grip;
+        height: root.grip;
+        edge: ResizeEdge.north;
+        mouse-cursor: ns-resize;
+        start-resize(edge) => { root.start-resize(edge); }
+    }
+    if !root.maximized: ResizeHandle {
+        x: root.grip;
+        y: root.height - root.grip;
+        width: root.width - 2 * root.grip;
+        height: root.grip;
+        edge: ResizeEdge.south;
+        mouse-cursor: ns-resize;
+        start-resize(edge) => { root.start-resize(edge); }
+    }
+    if !root.maximized: ResizeHandle {
+        x: 0;
+        y: root.grip;
+        width: root.grip;
+        height: root.height - 2 * root.grip;
+        edge: ResizeEdge.west;
+        mouse-cursor: ew-resize;
+        start-resize(edge) => { root.start-resize(edge); }
+    }
+    if !root.maximized: ResizeHandle {
+        x: root.width - root.grip;
+        y: root.grip;
+        width: root.grip;
+        height: root.height - 2 * root.grip;
+        edge: ResizeEdge.east;
+        mouse-cursor: ew-resize;
+        start-resize(edge) => { root.start-resize(edge); }
+    }
+    if !root.maximized: ResizeHandle {
+        x: 0;
+        y: 0;
+        width: root.grip;
+        height: root.grip;
+        edge: ResizeEdge.north-west;
+        mouse-cursor: nwse-resize;
+        start-resize(edge) => { root.start-resize(edge); }
+    }
+    if !root.maximized: ResizeHandle {
+        x: root.width - root.grip;
+        y: 0;
+        width: root.grip;
+        height: root.grip;
+        edge: ResizeEdge.north-east;
+        mouse-cursor: nesw-resize;
+        start-resize(edge) => { root.start-resize(edge); }
+    }
+    if !root.maximized: ResizeHandle {
+        x: 0;
+        y: root.height - root.grip;
+        width: root.grip;
+        height: root.grip;
+        edge: ResizeEdge.south-west;
+        mouse-cursor: nesw-resize;
+        start-resize(edge) => { root.start-resize(edge); }
+    }
+    if !root.maximized: ResizeHandle {
+        x: root.width - root.grip;
+        y: root.height - root.grip;
+        width: root.grip;
+        height: root.grip;
+        edge: ResizeEdge.south-east;
+        mouse-cursor: nwse-resize;
+        start-resize(edge) => { root.start-resize(edge); }
+    }
+}

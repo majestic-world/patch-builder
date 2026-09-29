@@ -1,0 +1,57 @@
+import { Theme } from "theme.slint";
+
+// Labeled folder picker: shows the chosen path and asks for another on click.
+export component PathField inherits VerticalLayout {
+    in property <string> label;
+    in property <string> path;
+    in property <string> placeholder;
+    callback pick();
+
+    spacing: 5px;
+
+    Text {
+        text: root.label;
+        font-size: 13.75px;
+        font-weight: 600;
+        color: Theme.ink;
+    }
+
+    Rectangle {
+        height: 45px;
+        border-radius: 8px;
+        border-width: 1px;
+        border-color: touch.has-hover ? Theme.field-border-hover : Theme.field-border;
+        background: Theme.field;
+
+        touch := TouchArea {
+            mouse-cursor: pointer;
+            clicked => { root.pick(); }
+        }
+
+        Image {
+            x: 16px;
+            width: 20px;
+            height: 20px;
+            source: @image-url("icons/folder.svg");
+            colorize: Theme.icon;
+        }
+
+        Text {
+            x: 52px;
+            width: parent.width - self.x - 48px;
+            text: root.path == "" ? root.placeholder : root.path;
+            font-size: 14.75px;
+            color: root.path == "" ? Theme.muted : Theme.ink;
+            overflow: elide;
+            vertical-alignment: center;
+        }
+
+        Image {
+            x: parent.width - self.width - 14px;
+            width: 16px;
+            height: 16px;
+            source: @image-url("icons/chevron-down.svg");
+            colorize: Theme.icon;
+        }
+    }
+}

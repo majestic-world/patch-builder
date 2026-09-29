@@ -1,0 +1,117 @@
+import { Theme } from "theme.slint";
+
+component WindowButton inherits Rectangle {
+    in property <image> icon;
+    in property <bool> destructive;
+    callback clicked();
+
+    width: 46px;
+    height: 32px;
+    background: touch.pressed ? (root.destructive ? Theme.close-pressed : Theme.control-pressed)
+        : touch.has-hover ? (root.destructive ? Theme.close-hover : Theme.control-hover)
+        : transparent;
+
+    touch := TouchArea {
+        clicked => { root.clicked(); }
+    }
+
+    Image {
+        width: 12px;
+        height: 12px;
+        source: root.icon;
+        colorize: root.destructive && touch.has-hover ? #FFFFFF : Theme.muted;
+    }
+}
+
+export component TitleBar inherits Rectangle {
+    in property <bool> maximized;
+    callback start-drag();
+    callback minimize();
+    callback toggle-maximize();
+    callback close();
+
+    height: 78px;
+    background: Theme.header;
+
+    // Dragging starts on the first move after a press so double-clicks still reach the TouchArea;
+    // the flag resets before the drag because the OS move loop swallows the release.
+    property <bool> drag-armed;
+    TouchArea {
+        pointer-event(event) => {
+            if (event.button == PointerEventButton.left) {
+                root.drag-armed = event.kind == PointerEventKind.down;
+            }
+        }
+        moved => {
+            if (root.drag-armed) {
+                root.drag-armed = false;
+                root.start-drag();
+            }
+        }
+        double-clicked => { root.toggle-maximize(); }
+    }
+
+    Rectangle {
+        x: 25px;
+        y: 18px;
+        width: 43px;
+        height: 43px;
+        border-radius: 10px;
+        background: Theme.logo;
+        drop-shadow-blur: 6px;
+        drop-shadow-offset-y: 2px;
+        drop-shadow-color: #3A40B833;
+
+        Image {
+            width: 27px;
+            height: 27px;
+            source: @image-url("icons/logo-mark.svg");
+        }
+    }
+
+    Text {
+        x: 84px;
+        y: 28.8px - self.height / 2;
+        text: "Patch Builder";
+        font-size: 17.5px;
+        font-weight: 600;
+        color: Theme.ink;
+    }
+
+    Text {
+        x: 84px;
+        y: 51.2px - self.height / 2;
+        text: "File hashing & zipping tool for game updates";
+        font-size: 12.25px;
+        color: Theme.muted;
+    }
+
+    HorizontalLayout {
+        width: 3 * 46px;
+        x: parent.width - self.width;
+        y: 0;
+        height: 32px;
+
+        WindowButton {
+            icon: @image-url("icons/window-minimize.svg");
+            clicked => { root.minimize(); }
+        }
+
+        WindowButton {
+            icon: root.maximized ? @image-url("icons/window-restore.svg") : @image-url("icons/window-maximize.svg");
+            clicked => { root.toggle-maximize(); }
+        }
+
+        WindowButton {
+            icon: @image-url("icons/window-close.svg");
+            destructive: true;
+            clicked => { root.close(); }
+        }
+    }
+
+    Rectangle {
+        y: parent.height - 1px;
+        height: 1px;
+        background: Theme.header-border;
+    }
+}
