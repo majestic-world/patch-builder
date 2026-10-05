@@ -1,36 +1,42 @@
+// Palette: white and grays, with #333 as the accent (buttons, highlights).
+// Only the file status colors (green/amber/slate) step outside this gray scale.
 export global Theme {
     // Surfaces
     out property <color> surface: #FFFFFF;
-    out property <color> header: #F9F9FC;
-    out property <color> field: #FBFBFD;
-    out property <color> table-header: #FAFAFC;
-    out property <color> summary: #F7F8FD;
-    out property <color> border: #E3E8F1;
-    out property <color> field-border: #DDE4F0;
-    out property <color> header-border: #EDF0F5;
-    out property <color> field-border-hover: #C5CEE0;
-    out property <color> guide: #D9E1EE;
-    out property <color> row-hover: #F7F8FB;
-    out property <color> row-selected: #FEF8F0;
-    out property <color> scroll-track: #EFF2F7;
-    out property <color> scroll-thumb: #C6CEDC;
-    out property <color> scroll-thumb-hover: #AAB4C7;
-    out property <color> scroll-thumb-pressed: #8F9AB0;
-    out property <color> window-border: #D9DEE8;
+    out property <color> header: #FAFAFA;
+    out property <color> field: #FAFAFA;
+    out property <color> table-header: #FAFAFA;
+    out property <color> summary: #F7F7F8;
+    out property <color> border: #E5E5E7;
+    out property <color> card-border: #EDEDEF;
+    out property <color> field-border: #DFDFE2;
+    out property <color> header-border: #EDEDEF;
+    out property <color> field-border-hover: #C7C7CB;
+    out property <color> guide: #DCDCDF;
+    out property <color> row-hover: #F6F6F7;
+    out property <color> row-selected: #F0F0F1;
+    out property <color> scroll-track: #EFEFF1;
+    out property <color> scroll-thumb: #C9C9CD;
+    out property <color> scroll-thumb-hover: #ACACB1;
+    out property <color> scroll-thumb-pressed: #8E8E94;
+    out property <color> window-border: #D9D9DC;
+    out property <color> card-shadow: #0000000A;
 
     // Text and icons
-    out property <color> ink: #141A33;
-    out property <color> ink-soft: #26324C;
-    out property <color> ink-data: #2E3B5C;
-    out property <color> muted: #5E6C8A;
-    out property <color> icon: #66718A;
+    out property <color> ink: #27272A;
+    out property <color> ink-soft: #3A3A3E;
+    out property <color> ink-data: #424247;
+    out property <color> muted: #6B6B72;
+    out property <color> icon: #707077;
 
     // Accent
-    out property <color> accent: #5560DA;
-    out property <color> accent-hover: #4B56D0;
-    out property <color> accent-pressed: #434DC2;
-    out property <color> accent-disabled: #B9BEF0;
-    out property <brush> logo: @linear-gradient(135deg, #6369EC 0%, #2F35A8 100%);
+    out property <color> accent: #333333;
+    out property <color> accent-hover: #444444;
+    out property <color> accent-pressed: #222222;
+    out property <color> accent-disabled: #C4C4C8;
+    out property <color> accent-fill: #EBEBED;
+    out property <brush> logo: @linear-gradient(135deg, #4A4A4A 0%, #222222 100%);
+    out property <color> logo-shadow: #33333333;
 
     // File status
     out property <color> new-dot: #1E9E55;
@@ -45,16 +51,12 @@ export global Theme {
     out property <color> unchanged-fill: #ECEEF3;
 
     // Summary badges
-    out property <color> indigo-fill: #ECECFC;
-    out property <color> indigo-icon: #4A52DD;
-    out property <color> green-fill: #DBF2E6;
-    out property <color> green-icon: #19A04F;
-    out property <color> gray-fill: #E8EBF1;
-    out property <color> gray-icon: #3F4A68;
+    out property <color> neutral-fill: #EDEDEF;
+    out property <color> neutral-icon: #3A3A3E;
 
     // Window controls
-    out property <color> control-hover: #EBEDF3;
-    out property <color> control-pressed: #E0E3EB;
-    out property <color> close-hover: #E81123;
-    out property <color> close-pressed: #C50F1F;
+    out property <color> control-hover: #EDEDEF;
+    out property <color> control-pressed: #E2E2E5;
+    out property <color> close-hover: #3A3A3E;
+    out property <color> close-pressed: #27272A;
 }

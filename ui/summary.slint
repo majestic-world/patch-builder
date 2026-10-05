@@ -26,10 +26,10 @@ component StatCard inherits Rectangle {
     background: Theme.surface;
     border-radius: 10px;
     border-width: 1px;
-    border-color: #EDF0F6;
+    border-color: Theme.card-border;
     drop-shadow-blur: 4px;
     drop-shadow-offset-y: 1px;
-    drop-shadow-color: #1A23500A;
+    drop-shadow-color: Theme.card-shadow;
 
     Rectangle {
         x: 16px;
@@ -98,13 +98,13 @@ export component BuildSummary inherits Rectangle {
         width: 48px;
         height: 48px;
         border-radius: self.width / 2;
-        background: Theme.indigo-fill;
+        background: Theme.accent-fill;
 
         Image {
             width: 24px;
             height: 24px;
             source: @image-url("icons/layers.svg");
-            colorize: Theme.indigo-icon;
+            colorize: Theme.accent;
         }
     }
 
@@ -137,8 +137,8 @@ export component BuildSummary inherits Rectangle {
 
         StatCard {
             icon: @image-url("icons/file-text.svg");
-            icon-color: Theme.indigo-icon;
-            badge: Theme.indigo-fill;
+            icon-color: Theme.neutral-icon;
+            badge: Theme.neutral-fill;
             label: "Manifest";
             value: root.summary.manifest-count;
             unit: root.summary.manifest-unit;
@@ -147,8 +147,8 @@ export component BuildSummary inherits Rectangle {
 
         StatCard {
             icon: @image-url("icons/zip.svg");
-            icon-color: Theme.green-icon;
-            badge: Theme.green-fill;
+            icon-color: Theme.accent;
+            badge: Theme.accent-fill;
             label: "To re-zip";
             value: root.summary.rezip-count;
             unit: root.summary.rezip-unit;
@@ -157,8 +157,8 @@ export component BuildSummary inherits Rectangle {
 
         StatCard {
             icon: @image-url("icons/refresh.svg");
-            icon-color: Theme.gray-icon;
-            badge: Theme.gray-fill;
+            icon-color: Theme.neutral-icon;
+            badge: Theme.neutral-fill;
             label: "Reused";
             value: root.summary.reused-count;
             unit: root.summary.reused-unit;

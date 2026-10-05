@@ -83,7 +83,7 @@ component RescanButton inherits Rectangle {
     if root.scanning: Rectangle {
         x: 0;
         width: parent.width * clamp(root.progress, 0, 1);
-        background: Theme.indigo-fill;
+        background: Theme.accent-fill;
     }
 
     touch := TouchArea {
