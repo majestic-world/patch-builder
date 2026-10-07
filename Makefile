@@ -1,5 +1,9 @@
+.DEFAULT_GOAL := build
+POWERSHELL ?= pwsh
+BUILD_SCRIPT := tools/build.ps1
+
 .PHONY: build
 
-# Optimized release binary: target/release/patch-builder.exe (profile in Cargo.toml).
+# Optimized release binary, published as dist/Builder.exe (logs in target/logs).
 build:
-	cargo build --release
+	$(POWERSHELL) -NoProfile -ExecutionPolicy Bypass -File "$(BUILD_SCRIPT)"

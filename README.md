@@ -34,7 +34,7 @@ Source/                      Update tree/
 ## Usage
 
 ```sh
-make build              # optimized binary: target/release/patch-builder.exe
+make build              # optimized binary: dist/Builder.exe (needs PowerShell 7)
 cargo run               # debug build
 cargo run -- --preview  # UI with sample data, no folders needed
 cargo test
