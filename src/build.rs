@@ -26,7 +26,7 @@ pub struct Report {
 ///
 /// Refuses to run when the Update tree's Manifest moved since the Scan, and stops when a file to
 /// re-zip no longer matches its scanned hash: the Manifest must describe exactly what the Archives hold.
-/// `on_progress(done, total)` reports bytes of re-zipped files; it is called from worker threads.
+/// `on_progress(done, total)` reports bytes of re-zipped files as they are read; it is called from worker threads.
 pub fn run(plan: &Plan, on_progress: &(dyn Fn(u64, u64) + Sync)) -> Result<Report, BuildError> {
     if scan::read_manifest(&plan.update_tree)? != plan.previous {
         return Err(BuildError::UpdateTreeChanged);
@@ -39,12 +39,9 @@ pub fn run(plan: &Plan, on_progress: &(dyn Fn(u64, u64) + Sync)) -> Result<Repor
     pending.sort_unstable_by_key(|file| std::cmp::Reverse(file.size));
     let total = pending.iter().map(|file| file.size).sum();
     let done = AtomicU64::new(0);
+    let advance = |bytes: u64| on_progress(done.fetch_add(bytes, Ordering::Relaxed) + bytes, total);
     on_progress(0, total);
-    pending.par_iter().try_for_each(|file| {
-        write_archive(plan, file)?;
-        on_progress(done.fetch_add(file.size, Ordering::Relaxed) + file.size, total);
-        Ok::<_, BuildError>(())
-    })?;
+    pending.par_iter().try_for_each(|file| write_archive(plan, file, &advance))?;
 
     let mut removed_archives = 0;
     for path in &plan.removed {
@@ -67,22 +64,25 @@ pub fn run(plan: &Plan, on_progress: &(dyn Fn(u64, u64) + Sync)) -> Result<Repor
     Ok(Report { manifest, manifest_written, rezipped: pending.len() as u64, removed_archives })
 }
 
-/// Hashes everything it reads, to prove the zipped bytes are the scanned ones.
-struct HashingReader<R> {
+/// Hashes everything it reads, to prove the zipped bytes are the scanned ones, and reports each read's size.
+struct HashingReader<'a, R> {
     inner: R,
     hasher: blake3::Hasher,
+    on_read: &'a (dyn Fn(u64) + Sync),
 }
 
-impl<R: Read> Read for HashingReader<R> {
+impl<R: Read> Read for HashingReader<'_, R> {
     fn read(&mut self, buffer: &mut [u8]) -> io::Result<usize> {
         let read = self.inner.read(buffer)?;
         self.hasher.update(&buffer[..read]);
+        (self.on_read)(read as u64);
         Ok(read)
     }
 }
 
 /// Zips one Source file under its own name, then moves the result over the old Archive.
-fn write_archive(plan: &Plan, file: &ComparedFile) -> Result<(), BuildError> {
+/// `on_read(bytes)` follows the Source bytes compressed so far.
+fn write_archive(plan: &Plan, file: &ComparedFile, on_read: &(dyn Fn(u64) + Sync)) -> Result<(), BuildError> {
     let archive = manifest::archive_path(&plan.update_tree, &file.path);
     let folder = archive.parent().expect("Archives live inside the Update tree");
     fs::create_dir_all(folder).map_err(io_at(folder))?;
@@ -98,8 +98,11 @@ fn write_archive(plan: &Plan, file: &ComparedFile) -> Result<(), BuildError> {
             .compression_method(CompressionMethod::Deflated)
             .large_file(file.size >= u64::from(u32::MAX));
         zip.start_file(name, options)?;
-        let mut reader =
-            HashingReader { inner: BufReader::with_capacity(1 << 20, File::open(&source)?), hasher: blake3::Hasher::new() };
+        let mut reader = HashingReader {
+            inner: BufReader::with_capacity(1 << 20, File::open(&source)?),
+            hasher: blake3::Hasher::new(),
+            on_read,
+        };
         io::copy(&mut reader, &mut zip)?;
         zip.finish()?.flush()?;
         Ok(reader.hasher.finalize())

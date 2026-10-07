@@ -172,3 +172,18 @@ fn progress_ends_at_the_size_of_the_files_to_rezip() {
     .unwrap();
     assert_eq!((furthest.into_inner(), total.into_inner()), (3, 3));
 }
+
+#[test]
+fn progress_advances_while_a_file_is_being_zipped() {
+    let folders = folders();
+    let size = 4 << 20;
+    put(&folders.source, "big", &vec![7; size]);
+    let partial = AtomicU64::new(0);
+    run(&scan(&folders), &|done, all| {
+        if 0 < done && done < all {
+            partial.fetch_add(1, Ordering::Relaxed);
+        }
+    })
+    .unwrap();
+    assert!(partial.into_inner() > 1, "a lone file must report progress before it finishes");
+}
