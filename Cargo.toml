@@ -23,14 +23,15 @@ winresource = { version = "0.1.31", default-features = false }
 [dev-dependencies]
 tempfile = "3.27.0"
 
-# Speed over binary size and build time. No `target-cpu=native`: BLAKE3 and zlib-rs already
-# pick SIMD at runtime, and the binary must still run on other publishers' machines.
+# Parallel codegen without cross-crate LTO. Measured on a 2 GB Source, fat LTO with one codegen
+# unit scanned and zipped no faster, but took 78 s instead of 10 s to rebuild after an edit: the
+# hot loops live inside BLAKE3 and zlib-rs, which gain nothing from inlining across crates.
+# No `target-cpu=native`: both crates pick SIMD at runtime, and the binary must still run on
+# other publishers' machines.
 [profile.release]
 opt-level = 3
-lto = "fat"
-codegen-units = 1
-incremental = false
-debug = false
+lto = false
+codegen-units = 16
 
 [target."cfg(windows)".dependencies]
 windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_UI_WindowsAndMessaging", "Win32_UI_HiDpi"] }
