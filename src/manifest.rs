@@ -7,15 +7,35 @@ use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
 
 pub const FILE_NAME: &str = "manifest.json";
-pub const HASH_ALGORITHM: &str = "blake3";
 /// Suffix that turns a Source file path into its Archive path.
 pub const ARCHIVE_SUFFIX: &str = ".zip";
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub enum HashAlgorithm {
+    #[default]
+    #[serde(rename = "blake3")]
+    Blake3,
+    #[serde(rename = "crc32")]
+    Crc32,
+    #[serde(rename = "blake3+crc32")]
+    Both,
+}
+
+impl HashAlgorithm {
+    pub fn blake3(self) -> bool {
+        matches!(self, Self::Blake3 | Self::Both)
+    }
+
+    pub fn crc32(self) -> bool {
+        matches!(self, Self::Crc32 | Self::Both)
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Manifest {
-    /// Grows by one whenever the file list changes, so Launchers can skip hashing an up-to-date install.
+    /// Grows by one whenever the file list or selected hash algorithm changes.
     pub version: u64,
-    pub hash_algorithm: String,
+    pub hash_algorithm: HashAlgorithm,
     /// Sorted by path.
     pub files: Vec<Entry>,
 }
@@ -28,13 +48,15 @@ pub struct Entry {
     pub size: u64,
     /// Hash of the uncompressed Source file, lowercase hex.
     pub hash: String,
+    /// CRC32 of the uncompressed Source file when both algorithms are selected.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub crc32: Option<String>,
 }
 
 #[derive(Debug)]
 pub enum ReadError {
     Io(io::Error),
     Invalid(serde_json::Error),
-    UnsupportedHash(String),
 }
 
 pub fn path_in(update_tree: &Path) -> PathBuf {
@@ -57,8 +79,12 @@ pub fn read(update_tree: &Path) -> Result<Option<Manifest>, ReadError> {
         Err(error) => return Err(ReadError::Io(error)),
     };
     let manifest: Manifest = serde_json::from_slice(&bytes).map_err(ReadError::Invalid)?;
-    if manifest.hash_algorithm != HASH_ALGORITHM {
-        return Err(ReadError::UnsupportedHash(manifest.hash_algorithm));
+    if manifest.files.iter().any(|entry| {
+        (manifest.hash_algorithm == HashAlgorithm::Both) != entry.crc32.is_some()
+    }) {
+        return Err(ReadError::Invalid(<serde_json::Error as serde::de::Error>::custom(
+            "CRC32 field does not match the manifest hash algorithm",
+        )));
     }
     Ok(Some(manifest))
 }

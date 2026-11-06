@@ -4,6 +4,8 @@ import "fonts/Inter-SemiBold.ttf";
 import "fonts/Inter-Bold.ttf";
 import "fonts/JetBrainsMono-Regular.ttf";
 
+import { CheckBox, Palette } from "std-widgets.slint";
+
 import { Theme } from "theme.slint";
 import { TitleBar } from "title-bar.slint";
 import { PathField } from "path-field.slint";
@@ -140,11 +142,15 @@ export component AppWindow inherits Window {
     in property <float> scan-progress;
     // The last Scan found something to publish.
     in property <bool> can-build;
+    in-out property <bool> hash-blake3: true;
+    in-out property <bool> hash-crc32: false;
 
     callback pick-source();
     callback pick-update-tree();
     callback build();
     callback rescan();
+    callback blake3-toggled();
+    callback crc32-toggled();
     callback row-clicked(node: int);
     callback sort-clicked();
 
@@ -164,6 +170,9 @@ export component AppWindow inherits Window {
     // Transparent so the rounded frame below owns the corners, anti-aliased by the renderer.
     background: transparent;
     default-font-family: "Inter";
+
+    // The app uses a light surface even when the system prefers a dark color scheme.
+    init => { Palette.color-scheme = ColorScheme.light; }
 
     // Larger than the 8px DWM rounds the window with, so its un-anti-aliased clip stays outside this curve.
     property <length> corner-radius: root.maximized ? 0 : 10px;
@@ -239,6 +248,35 @@ export component AppWindow inherits Window {
                         progress: root.build-progress;
                         clicked => { root.build(); }
                     }
+                }
+            }
+
+            HorizontalLayout {
+                alignment: start;
+                spacing: 20px;
+
+                Text {
+                    text: "Hash";
+                    font-size: 12.75px;
+                    font-weight: 600;
+                    color: Theme.ink;
+                    vertical-alignment: center;
+                }
+                CheckBox {
+                    text: "BLAKE3";
+                    font-size: 12.75px;
+                    font-weight: 500;
+                    checked <=> root.hash-blake3;
+                    enabled: !root.scanning && !root.building;
+                    toggled => { root.blake3-toggled(); }
+                }
+                CheckBox {
+                    text: "CRC32";
+                    font-size: 12.75px;
+                    font-weight: 500;
+                    checked <=> root.hash-crc32;
+                    enabled: !root.scanning && !root.building;
+                    toggled => { root.crc32-toggled(); }
                 }
             }
 

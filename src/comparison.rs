@@ -17,8 +17,10 @@ pub struct ComparedFile {
     pub status: FileStatus,
     /// Size of the uncompressed Source file, in bytes.
     pub size: u64,
-    /// BLAKE3 hash of the uncompressed Source file, lowercase hex.
+    /// Primary hash of the uncompressed Source file, lowercase hex.
     pub hash: String,
+    /// CRC32 hash when both algorithms are selected.
+    pub crc32: Option<String>,
 }
 
 /// What a Build publishes, aggregated from a comparison.

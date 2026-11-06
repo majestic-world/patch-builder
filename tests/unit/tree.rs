@@ -2,7 +2,7 @@ use super::*;
 
 /// A New file, so every folder above it starts expanded.
 fn file(path: &str) -> ComparedFile {
-    ComparedFile { path: path.to_owned(), status: FileStatus::New, size: 1, hash: String::new() }
+    ComparedFile { path: path.to_owned(), status: FileStatus::New, size: 1, hash: String::new(), crc32: None }
 }
 
 fn file_with(path: &str, status: FileStatus) -> ComparedFile {

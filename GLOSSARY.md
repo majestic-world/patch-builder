@@ -17,11 +17,11 @@ The compressed copy of exactly one Source file, stored at the same relative path
 _Avoid_: zip, package, patch file
 
 **Manifest**:
-The JSON document listing every Source file of the current Source with its size and hash, both taken from the uncompressed Source file; the single entry point a Launcher reads.
+The JSON document listing every Source file of the current Source with its size and selected hashes, taken from the uncompressed Source file; the single entry point a Launcher reads.
 _Avoid_: hash file, hash list, index
 
 **Manifest version**:
-A number in the Manifest that grows by one whenever its file list changes; a Launcher that already installed that version has nothing to download.
+A number in the Manifest that grows by one whenever its file list or selected hash algorithms change; a Launcher that already installed that version has nothing to download.
 _Avoid_: build number, revision, patch level
 
 **Update tree**:
@@ -29,7 +29,7 @@ The published output of a Build: the Manifest plus every Archive, mirroring the 
 _Avoid_: patch, output folder
 
 **Scan**:
-Hashing every Source file and comparing it with the Update tree's current Manifest, without writing anything; it runs when the app opens, when a folder is chosen, and on Rescan.
+Hashing every Source file and comparing it with the Update tree's current Manifest, without writing anything; it runs when the app opens, when a folder or hash selection changes, and on Rescan.
 _Avoid_: analysis, check, verification
 
 **Plan**:

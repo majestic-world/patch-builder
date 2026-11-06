@@ -22,7 +22,7 @@ fn put(root: &Path, path: &str, contents: &[u8]) {
 }
 
 fn scan(folders: &Folders) -> Plan {
-    run(&folders.source, &folders.update_tree, &|_, _| {}).unwrap()
+    run(&folders.source, &folders.update_tree, HashAlgorithm::Blake3, &|_, _| {}).unwrap()
 }
 
 fn publish(folders: &Folders) -> Plan {
@@ -113,7 +113,7 @@ fn published_plan_matches_a_fresh_scan() {
 #[test]
 fn update_tree_inside_the_source_is_rejected_even_before_it_exists() {
     let folders = folders();
-    let error = run(&folders.source, &folders.source.join("dist"), &|_, _| {}).err().unwrap();
+    let error = run(&folders.source, &folders.source.join("dist"), HashAlgorithm::Blake3, &|_, _| {}).err().unwrap();
     assert!(matches!(error, BuildError::OverlappingFolders));
 }
 
@@ -124,7 +124,7 @@ fn progress_ends_at_the_total_source_size() {
     put(&folders.source, "b/c", b"678");
     // Workers report concurrently, so keep the furthest point reached rather than the last call.
     let (furthest, total) = (AtomicU64::new(0), AtomicU64::new(0));
-    run(&folders.source, &folders.update_tree, &|done, all| {
+    run(&folders.source, &folders.update_tree, HashAlgorithm::Blake3, &|done, all| {
         furthest.fetch_max(done, Ordering::Relaxed);
         total.store(all, Ordering::Relaxed);
     })
@@ -139,6 +139,6 @@ fn paths_differing_only_in_case_are_rejected() {
     let folders = folders();
     put(&folders.source, "Maps/a.unr", b"1");
     put(&folders.source, "maps/a.unr", b"2");
-    let error = run(&folders.source, &folders.update_tree, &|_, _| {}).err().unwrap();
+    let error = run(&folders.source, &folders.update_tree, HashAlgorithm::Blake3, &|_, _| {}).err().unwrap();
     assert!(matches!(error, BuildError::CaseCollision { .. }));
 }

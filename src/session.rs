@@ -14,6 +14,7 @@ use slint::winit_030::WinitWindowAccessor;
 use slint::{ComponentHandle, SharedString};
 
 use crate::build::{self, Report};
+use crate::manifest::HashAlgorithm;
 use crate::scan::{self, Plan};
 use crate::settings::{self, Settings};
 use crate::view::Table;
@@ -35,6 +36,8 @@ impl Session {
         let saved = settings::load();
         ui.set_source_path(saved.source.into());
         ui.set_update_tree_path(saved.update_tree.into());
+        ui.set_hash_blake3(saved.hash_algorithm != HashAlgorithm::Crc32);
+        ui.set_hash_crc32(saved.hash_algorithm != HashAlgorithm::Blake3);
 
         ui.on_pick_source(session.callback(ui, |session, ui| {
             if let Some(path) = pick_folder(ui, "Choose the Source folder", &ui.get_source_path()) {
@@ -50,6 +53,20 @@ impl Session {
         }));
         ui.on_rescan(session.callback(ui, |session, ui| session.scan(ui)));
         ui.on_build(session.callback(ui, |session, ui| session.build(ui)));
+        ui.on_blake3_toggled(session.callback(ui, |session, ui| {
+            if !ui.get_hash_blake3() && !ui.get_hash_crc32() {
+                ui.set_hash_blake3(true);
+            } else {
+                session.folders_changed(ui);
+            }
+        }));
+        ui.on_crc32_toggled(session.callback(ui, |session, ui| {
+            if !ui.get_hash_blake3() && !ui.get_hash_crc32() {
+                ui.set_hash_crc32(true);
+            } else {
+                session.folders_changed(ui);
+            }
+        }));
 
         // Scans once the event loop runs, so the window shows up before the hashing starts.
         let first_scan = session.callback(ui, |session, ui| session.scan(ui));
@@ -66,9 +83,13 @@ impl Session {
     }
 
     fn folders_changed(self: &Rc<Self>, ui: &AppWindow) {
-        let saved = Settings { source: ui.get_source_path().into(), update_tree: ui.get_update_tree_path().into() };
+        let saved = Settings {
+            source: ui.get_source_path().into(),
+            update_tree: ui.get_update_tree_path().into(),
+            hash_algorithm: selected_algorithm(ui),
+        };
         if let Err(error) = settings::save(&saved) {
-            show_error(ui, "Folders not saved", &format!("The chosen folders will not be remembered: {error}"));
+            show_error(ui, "Settings not saved", &format!("The chosen settings will not be remembered: {error}"));
         }
         self.scan(ui);
     }
@@ -76,18 +97,22 @@ impl Session {
     /// Hashes the Source on a worker thread and keeps the resulting Plan for the next Build.
     fn scan(self: &Rc<Self>, ui: &AppWindow) {
         let (source, update_tree) = (ui.get_source_path(), ui.get_update_tree_path());
-        if source.is_empty() || update_tree.is_empty() || busy(ui) {
+        if busy(ui) {
             return;
         }
         self.plan.replace(None);
         self.table.clear(ui);
         ui.set_can_build(false);
+        if source.is_empty() || update_tree.is_empty() {
+            return;
+        }
         ui.set_scan_progress(0.0);
         ui.set_scanning(true);
 
         let progress = progress_reporter(ui, AppWindow::set_scan_progress, AppWindow::get_scan_progress);
         let (source, update_tree) = (PathBuf::from(source.as_str()), PathBuf::from(update_tree.as_str()));
-        let job = in_background(move || scan::run(&source, &update_tree, &progress));
+        let algorithm = selected_algorithm(ui);
+        let job = in_background(move || scan::run(&source, &update_tree, algorithm, &progress));
         self.when_done(ui, job, |session, ui, result| {
             ui.set_scanning(false);
             match result {
@@ -160,6 +185,14 @@ impl Session {
             }
         })
         .expect("callbacks run inside the Slint event loop");
+    }
+}
+
+fn selected_algorithm(ui: &AppWindow) -> HashAlgorithm {
+    match (ui.get_hash_blake3(), ui.get_hash_crc32()) {
+        (true, true) => HashAlgorithm::Both,
+        (false, true) => HashAlgorithm::Crc32,
+        _ => HashAlgorithm::Blake3,
     }
 }
 

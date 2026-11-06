@@ -3298,6 +3298,7 @@ name = "patch-builder"
 version = "0.1.0"
 dependencies = [
  "blake3",
+ "crc32fast",
  "dirs",
  "futures-channel",
  "rayon",

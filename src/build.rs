@@ -11,7 +11,7 @@ use zip::{CompressionMethod, ZipWriter};
 
 use crate::comparison::{ComparedFile, FileStatus};
 use crate::error::{BuildError, io_at};
-use crate::manifest::{self, HASH_ALGORITHM, Manifest};
+use crate::manifest::{self, HashAlgorithm, Manifest};
 use crate::scan::{self, Plan};
 
 pub struct Report {
@@ -34,8 +34,15 @@ pub fn run(plan: &Plan, on_progress: &(dyn Fn(u64, u64) + Sync)) -> Result<Repor
     fs::create_dir_all(&plan.update_tree).map_err(io_at(&plan.update_tree))?;
 
     // Largest files first, so a big file never starts last and leaves the other cores idle.
-    let mut pending: Vec<&ComparedFile> =
-        plan.files.iter().filter(|file| file.status != FileStatus::Unchanged).collect();
+    let verify_reused = plan.previous.as_ref().is_some_and(|previous| {
+        previous.hash_algorithm == HashAlgorithm::Crc32 && plan.algorithm.blake3()
+    });
+    let mut pending: Vec<&ComparedFile> = plan.files.iter().filter(|file| {
+        file.status != FileStatus::Unchanged
+            || (verify_reused && !scan::archive_matches_blake3(
+                &manifest::archive_path(&plan.update_tree, &file.path), &file.hash,
+            ))
+    }).collect();
     pending.sort_unstable_by_key(|file| std::cmp::Reverse(file.size));
     let total = pending.iter().map(|file| file.size).sum();
     let done = AtomicU64::new(0);
@@ -53,7 +60,7 @@ pub fn run(plan: &Plan, on_progress: &(dyn Fn(u64, u64) + Sync)) -> Result<Repor
     let manifest_written = plan.changes_manifest();
     let manifest = if manifest_written {
         let manifest =
-            Manifest { version: plan.next_version(), hash_algorithm: HASH_ALGORITHM.to_owned(), files: plan.entries() };
+            Manifest { version: plan.next_version(), hash_algorithm: plan.algorithm, files: plan.entries() };
         // Written last: Launchers only see the new Manifest once every Archive it lists exists.
         manifest::write(&plan.update_tree, &manifest).map_err(io_at(&manifest::path_in(&plan.update_tree)))?;
         manifest
@@ -67,14 +74,16 @@ pub fn run(plan: &Plan, on_progress: &(dyn Fn(u64, u64) + Sync)) -> Result<Repor
 /// Hashes everything it reads, to prove the zipped bytes are the scanned ones, and reports each read's size.
 struct HashingReader<'a, R> {
     inner: R,
-    hasher: blake3::Hasher,
+    hashers: scan::Hashers,
+    bytes_read: u64,
     on_read: &'a (dyn Fn(u64) + Sync),
 }
 
 impl<R: Read> Read for HashingReader<'_, R> {
     fn read(&mut self, buffer: &mut [u8]) -> io::Result<usize> {
         let read = self.inner.read(buffer)?;
-        self.hasher.update(&buffer[..read]);
+        self.hashers.update(&buffer[..read]);
+        self.bytes_read += read as u64;
         (self.on_read)(read as u64);
         Ok(read)
     }
@@ -92,7 +101,7 @@ fn write_archive(plan: &Plan, file: &ComparedFile, on_read: &(dyn Fn(u64) + Sync
     let name = file.path.rsplit('/').next().unwrap_or(&file.path);
     let source: PathBuf = plan.source.join(&file.path);
 
-    let written = (|| -> io::Result<blake3::Hash> {
+    let written = (|| -> io::Result<((String, Option<String>), u64)> {
         let mut zip = ZipWriter::new(BufWriter::new(File::create(&staging)?));
         let options = SimpleFileOptions::default()
             .compression_method(CompressionMethod::Deflated)
@@ -100,15 +109,16 @@ fn write_archive(plan: &Plan, file: &ComparedFile, on_read: &(dyn Fn(u64) + Sync
         zip.start_file(name, options)?;
         let mut reader = HashingReader {
             inner: BufReader::with_capacity(1 << 20, File::open(&source)?),
-            hasher: blake3::Hasher::new(),
+            hashers: scan::Hashers::new(plan.algorithm.blake3(), plan.algorithm.crc32()),
+            bytes_read: 0,
             on_read,
         };
         io::copy(&mut reader, &mut zip)?;
         zip.finish()?.flush()?;
-        Ok(reader.hasher.finalize())
+        Ok((reader.hashers.finish().selected(plan.algorithm), reader.bytes_read))
     })();
     let outcome = match written {
-        Ok(hash) if hash.to_hex().as_str() == file.hash => {
+        Ok(((hash, crc32), size)) if hash == file.hash && crc32 == file.crc32 && size == file.size => {
             fs::rename(&staging, &archive).map_err(|error| BuildError::Io { path: archive.clone(), error })
         }
         Ok(_) => Err(BuildError::SourceChanged(file.path.clone())),

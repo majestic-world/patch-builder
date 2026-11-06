@@ -4,7 +4,7 @@ use std::fmt;
 use std::io;
 use std::path::{Path, PathBuf};
 
-use crate::manifest::{self, HASH_ALGORITHM};
+use crate::manifest;
 
 #[derive(Debug)]
 pub enum BuildError {
@@ -42,11 +42,6 @@ impl fmt::Display for BuildError {
                 manifest::ReadError::Invalid(error) => {
                     write!(f, "{} is not a valid Manifest: {error}", path.display())
                 }
-                manifest::ReadError::UnsupportedHash(algorithm) => write!(
-                    f,
-                    "{} uses the {algorithm} hash; this app only reads {HASH_ALGORITHM} Manifests.",
-                    path.display()
-                ),
             },
             Self::UpdateTreeChanged => write!(f, "The Update tree changed since the last Scan. {RESCAN}"),
             Self::SourceChanged(path) => write!(f, "{path} changed since the last Scan. {RESCAN}"),

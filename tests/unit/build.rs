@@ -1,4 +1,5 @@
 use super::*;
+use crate::manifest::HashAlgorithm;
 
 struct Folders {
     _root: tempfile::TempDir,
@@ -21,7 +22,7 @@ fn put(root: &Path, path: &str, contents: &[u8]) {
 }
 
 fn scan(folders: &Folders) -> Plan {
-    scan::run(&folders.source, &folders.update_tree, &|_, _| {}).unwrap()
+    scan::run(&folders.source, &folders.update_tree, HashAlgorithm::Blake3, &|_, _| {}).unwrap()
 }
 
 fn build(plan: &Plan) -> Result<Report, BuildError> {
@@ -58,15 +59,16 @@ fn first_build_zips_every_file_and_lists_it_in_the_manifest() {
     assert_eq!(unzip(&folders.update_tree, "system/Fonts.utx"), ("Fonts.utx".to_owned(), b"fonts".to_vec()));
     let manifest = manifest_of(&folders);
     assert_eq!(manifest, report.manifest);
-    assert_eq!((manifest.version, manifest.hash_algorithm.as_str()), (1, "blake3"));
+    assert_eq!((manifest.version, manifest.hash_algorithm), (1, HashAlgorithm::Blake3));
     assert_eq!(
         manifest.files,
         [
-            manifest::Entry { path: "L2.exe".into(), size: 6, hash: blake3::hash(b"client").to_hex().to_string() },
+            manifest::Entry { path: "L2.exe".into(), size: 6, hash: blake3::hash(b"client").to_hex().to_string(), crc32: None },
             manifest::Entry {
                 path: "system/Fonts.utx".into(),
                 size: 5,
                 hash: blake3::hash(b"fonts").to_hex().to_string(),
+                crc32: None,
             },
         ]
     );
@@ -186,4 +188,167 @@ fn progress_advances_while_a_file_is_being_zipped() {
     })
     .unwrap();
     assert!(partial.into_inner() > 1, "a lone file must report progress before it finishes");
+}
+
+fn scan_with(folders: &Folders, algorithm: HashAlgorithm) -> Plan {
+    scan::run(&folders.source, &folders.update_tree, algorithm, &|_, _| {}).unwrap()
+}
+
+#[test]
+fn manifest_json_uses_the_selected_hashes() {
+    for algorithm in [HashAlgorithm::Blake3, HashAlgorithm::Crc32, HashAlgorithm::Both] {
+        let folders = folders();
+        put(&folders.source, "data", b"123456789");
+        build(&scan_with(&folders, algorithm)).unwrap();
+        let json: serde_json::Value = serde_json::from_slice(&fs::read(manifest::path_in(&folders.update_tree)).unwrap()).unwrap();
+        let blake3 = blake3::hash(b"123456789").to_hex().to_string();
+        let expected = match algorithm {
+            HashAlgorithm::Blake3 => serde_json::json!({"version": 1, "hash_algorithm": "blake3", "files": [
+                {"path": "data", "size": 9, "hash": blake3}
+            ]}),
+            HashAlgorithm::Crc32 => serde_json::json!({"version": 1, "hash_algorithm": "crc32", "files": [
+                {"path": "data", "size": 9, "hash": "cbf43926"}
+            ]}),
+            HashAlgorithm::Both => serde_json::json!({"version": 1, "hash_algorithm": "blake3+crc32", "files": [
+                {"path": "data", "size": 9, "hash": blake3, "crc32": "cbf43926"}
+            ]}),
+        };
+        assert_eq!(json, expected);
+        assert_eq!(unzip(&folders.update_tree, "data").1, b"123456789");
+        assert!(!scan_with(&folders, algorithm).has_work());
+    }
+}
+
+#[test]
+fn algorithm_transitions_reuse_only_matching_archives() {
+    let algorithms = [HashAlgorithm::Blake3, HashAlgorithm::Crc32, HashAlgorithm::Both];
+    for previous in algorithms {
+        for selected in algorithms {
+            if previous == selected {
+                continue;
+            }
+            let folders = folders();
+            put(&folders.source, "same", b"123456789");
+            put(&folders.source, "changed", b"old");
+            build(&scan_with(&folders, previous)).unwrap();
+            let original_archive = fs::read(manifest::archive_path(&folders.update_tree, "same")).unwrap();
+            put(&folders.source, "changed", b"new");
+            let plan = scan_with(&folders, selected);
+            assert!(plan.has_work());
+            assert_eq!(plan.files.iter().find(|file| file.path == "same").unwrap().status, FileStatus::Unchanged);
+            assert_eq!(plan.files.iter().find(|file| file.path == "changed").unwrap().status, FileStatus::Changed);
+            let report = build(&plan).unwrap();
+            assert_eq!((report.rezipped, report.manifest.version, report.manifest.hash_algorithm), (1, 2, selected));
+            assert_eq!(fs::read(manifest::archive_path(&folders.update_tree, "same")).unwrap(), original_archive);
+            assert_eq!(unzip(&folders.update_tree, "changed").1, b"new");
+            assert!(!scan_with(&folders, selected).has_work());
+        }
+    }
+}
+
+#[test]
+fn selection_alone_publishes_without_rezipping_including_empty_source() {
+    for with_file in [false, true] {
+        let folders = folders();
+        if with_file {
+            put(&folders.source, "data", b"123456789");
+        }
+        build(&scan_with(&folders, HashAlgorithm::Blake3)).unwrap();
+        for (version, algorithm) in [(2, HashAlgorithm::Crc32), (3, HashAlgorithm::Both), (4, HashAlgorithm::Blake3)] {
+            let plan = scan_with(&folders, algorithm);
+            assert!(plan.has_work());
+            let report = build(&plan).unwrap();
+            assert_eq!((report.rezipped, report.manifest_written, report.manifest.version), (0, true, version));
+            assert!(!scan_with(&folders, algorithm).has_work());
+        }
+    }
+}
+
+#[test]
+fn all_selected_hashes_are_checked_against_archived_bytes() {
+    for algorithm in [HashAlgorithm::Blake3, HashAlgorithm::Crc32, HashAlgorithm::Both] {
+        let folders = folders();
+        put(&folders.source, "data", b"123456789");
+        let plan = scan_with(&folders, algorithm);
+        put(&folders.source, "data", b"987654321");
+        assert!(matches!(build(&plan), Err(BuildError::SourceChanged(_))));
+        assert!(!manifest::path_in(&folders.update_tree).exists());
+    }
+
+    let folders = folders();
+    put(&folders.source, "data", b"123456789");
+    let mut plan = scan_with(&folders, HashAlgorithm::Both);
+    plan.files[0].crc32 = Some("00000000".into());
+    assert!(matches!(build(&plan), Err(BuildError::SourceChanged(_))));
+    assert!(!manifest::path_in(&folders.update_tree).exists());
+}
+
+#[test]
+fn previous_dual_hashes_are_both_checked() {
+    let folders = folders();
+    put(&folders.source, "data", b"123456789");
+    build(&scan_with(&folders, HashAlgorithm::Both)).unwrap();
+    let mut previous = manifest_of(&folders);
+    previous.files[0].crc32 = Some("00000000".into());
+    manifest::write(&folders.update_tree, &previous).unwrap();
+    let plan = scan_with(&folders, HashAlgorithm::Blake3);
+    assert_eq!(plan.files[0].status, FileStatus::Changed);
+}
+
+#[test]
+fn malformed_or_unsupported_manifest_algorithms_are_rejected() {
+    let folders = folders();
+    fs::create_dir(&folders.update_tree).unwrap();
+    for json in [
+        r#"{"version":1,"hash_algorithm":"sha256","files":[]}"#,
+        r#"{"version":1,"hash_algorithm":"blake3+crc32","files":[{"path":"data","size":0,"hash":"abc"}]}"#,
+    ] {
+        fs::write(manifest::path_in(&folders.update_tree), json).unwrap();
+        assert!(matches!(manifest::read(&folders.update_tree), Err(manifest::ReadError::Invalid(_))));
+    }
+}
+
+#[test]
+fn legacy_blake3_manifest_is_read_and_can_transition() {
+    let folders = folders();
+    put(&folders.source, "data", b"123456789");
+    build(&scan_with(&folders, HashAlgorithm::Blake3)).unwrap();
+    let hash = blake3::hash(b"123456789").to_hex().to_string();
+    let legacy = format!(r#"{{"version":7,"hash_algorithm":"blake3","files":[{{"path":"data","size":9,"hash":"{hash}"}}]}}"#);
+    fs::write(manifest::path_in(&folders.update_tree), legacy).unwrap();
+    let plan = scan_with(&folders, HashAlgorithm::Both);
+    assert_eq!(plan.files[0].status, FileStatus::Unchanged);
+    let report = build(&plan).unwrap();
+    assert_eq!((report.rezipped, report.manifest.version), (0, 8));
+    assert_eq!(report.manifest.files[0].crc32.as_deref(), Some("cbf43926"));
+}
+
+#[test]
+fn crc32_collision_requires_rezipping_when_adding_blake3() {
+    for selected in [HashAlgorithm::Blake3, HashAlgorithm::Both] {
+        let folders = folders();
+        put(&folders.source, "data", b"plumless");
+        build(&scan_with(&folders, HashAlgorithm::Crc32)).unwrap();
+        assert_eq!(manifest_of(&folders).files[0].hash, "4ddb0c25");
+        put(&folders.source, "data", b"buckeroo");
+        let plan = scan_with(&folders, selected);
+        assert_eq!(plan.files[0].status, FileStatus::Changed);
+        let report = build(&plan).unwrap();
+        assert_eq!(report.rezipped, 1);
+        assert_eq!(unzip(&folders.update_tree, "data").1, b"buckeroo");
+        assert!(!scan_with(&folders, selected).has_work());
+    }
+}
+
+#[test]
+fn crc32_transition_rechecks_reused_archive_at_build_time() {
+    let folders = folders();
+    put(&folders.source, "data", b"plumless");
+    build(&scan_with(&folders, HashAlgorithm::Crc32)).unwrap();
+    let plan = scan_with(&folders, HashAlgorithm::Both);
+    assert_eq!(plan.files[0].status, FileStatus::Unchanged);
+    fs::write(manifest::archive_path(&folders.update_tree, "data"), b"corrupt").unwrap();
+    let report = build(&plan).unwrap();
+    assert_eq!(report.rezipped, 1);
+    assert_eq!(unzip(&folders.update_tree, "data").1, b"plumless");
 }

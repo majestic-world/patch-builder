@@ -14,6 +14,7 @@ pub fn files() -> Vec<ComparedFile> {
         status,
         size,
         hash: hash.to_owned(),
+        crc32: None,
     };
     vec![
         file(
