@@ -38,6 +38,7 @@ impl Session {
         ui.set_update_tree_path(saved.update_tree.into());
         ui.set_hash_blake3(saved.hash_algorithm != HashAlgorithm::Crc32);
         ui.set_hash_crc32(saved.hash_algorithm != HashAlgorithm::Blake3);
+        ui.set_dark_theme(saved.dark_theme);
 
         ui.on_pick_source(session.callback(ui, |session, ui| {
             if let Some(path) = pick_folder(ui, "Choose the Source folder", &ui.get_source_path()) {
@@ -67,6 +68,7 @@ impl Session {
                 session.folders_changed(ui);
             }
         }));
+        ui.on_theme_changed(session.callback(ui, |session, ui| session.save_settings(ui)));
 
         // Scans once the event loop runs, so the window shows up before the hashing starts.
         let first_scan = session.callback(ui, |session, ui| session.scan(ui));
@@ -83,15 +85,20 @@ impl Session {
     }
 
     fn folders_changed(self: &Rc<Self>, ui: &AppWindow) {
+        self.save_settings(ui);
+        self.scan(ui);
+    }
+
+    fn save_settings(&self, ui: &AppWindow) {
         let saved = Settings {
             source: ui.get_source_path().into(),
             update_tree: ui.get_update_tree_path().into(),
             hash_algorithm: selected_algorithm(ui),
+            dark_theme: ui.get_dark_theme(),
         };
         if let Err(error) = settings::save(&saved) {
             show_error(ui, "Settings not saved", &format!("The chosen settings will not be remembered: {error}"));
         }
-        self.scan(ui);
     }
 
     /// Hashes the Source on a worker thread and keeps the resulting Plan for the next Build.

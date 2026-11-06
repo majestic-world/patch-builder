@@ -1,4 +1,4 @@
-//! Folders and hash selection remembered between sessions in the user's app-data folder.
+//! Folders, hash selection, and appearance remembered between sessions in the user's app-data folder.
 
 use std::fs;
 use std::io;
@@ -16,6 +16,8 @@ pub struct Settings {
     pub update_tree: String,
     #[serde(default)]
     pub hash_algorithm: HashAlgorithm,
+    #[serde(default)]
+    pub dark_theme: bool,
 }
 
 /// `%APPDATA%\Patch Builder\settings.json` on Windows; the platform config folder elsewhere.

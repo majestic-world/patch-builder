@@ -35,7 +35,7 @@ component BuildButton inherits Rectangle {
     if root.building: Rectangle {
         x: 0;
         width: parent.width * clamp(root.progress, 0, 1);
-        background: #FFFFFF2E;
+        background: Theme.accent-progress-overlay;
     }
 
     touch := TouchArea {
@@ -54,7 +54,7 @@ component BuildButton inherits Rectangle {
                 width: 20px;
                 height: 20px;
                 source: @image-url("icons/play.svg");
-                colorize: #FFFFFF;
+                colorize: root.enabled ? Theme.accent-foreground : Theme.accent-disabled-foreground;
             }
         }
 
@@ -62,7 +62,7 @@ component BuildButton inherits Rectangle {
             text: root.building ? "Building… \{Math.floor(root.progress * 100)}%" : "Build";
             font-size: 15px;
             font-weight: 600;
-            color: #FFFFFF;
+            color: root.enabled || root.building ? Theme.accent-foreground : Theme.accent-disabled-foreground;
             vertical-alignment: center;
         }
     }
@@ -144,6 +144,7 @@ export component AppWindow inherits Window {
     in property <bool> can-build;
     in-out property <bool> hash-blake3: true;
     in-out property <bool> hash-crc32: false;
+    in-out property <bool> dark-theme <=> Theme.dark-theme;
 
     callback pick-source();
     callback pick-update-tree();
@@ -153,6 +154,7 @@ export component AppWindow inherits Window {
     callback crc32-toggled();
     callback row-clicked(node: int);
     callback sort-clicked();
+    callback theme-changed();
 
     callback start-drag();
     callback start-resize(edge: ResizeEdge);
@@ -171,8 +173,9 @@ export component AppWindow inherits Window {
     background: transparent;
     default-font-family: "Inter";
 
-    // The app uses a light surface even when the system prefers a dark color scheme.
-    init => { Palette.color-scheme = ColorScheme.light; }
+    // The explicit in-app choice always drives the standard widget palette.
+    init => { Palette.color-scheme = root.dark-theme ? ColorScheme.dark : ColorScheme.light; }
+    changed dark-theme => { Palette.color-scheme = root.dark-theme ? ColorScheme.dark : ColorScheme.light; }
 
     // Larger than the 8px DWM rounds the window with, so its un-anti-aliased clip stays outside this curve.
     property <length> corner-radius: root.maximized ? 0 : 10px;
@@ -186,10 +189,15 @@ export component AppWindow inherits Window {
         TitleBar {
             corner-radius: root.corner-radius;
             maximized: root.maximized;
+            dark-theme: root.dark-theme;
             start-drag => { root.start-drag(); }
             minimize => { root.minimized = true; }
             toggle-maximize => { root.maximized = !root.maximized; }
             close => { root.close(); }
+            toggle-theme => {
+                root.dark-theme = !root.dark-theme;
+                root.theme-changed();
+            }
         }
 
         VerticalLayout {

@@ -42,7 +42,7 @@ cargo run -- --preview  # UI with sample data, no folders needed
 cargo test
 ```
 
-The chosen folders and hash algorithms are saved in `%APPDATA%\Patch Builder\settings.json`.
+The chosen folders, hash algorithms, and Light or Dark appearance are saved in `%APPDATA%\Patch Builder\settings.json`.
 
 ## Docs
 

@@ -1,62 +1,70 @@
-// Palette: white and grays, with #333 as the accent (buttons, highlights).
-// Only the file status colors (green/amber/slate) step outside this gray scale.
+// Light keeps the original palette. Dark uses cool charcoal neutrals with status colors tuned
+// for dark surfaces. Components consume these semantic values without branching on appearance.
 export global Theme {
+    in-out property <bool> dark-theme: false;
+
     // Surfaces
-    out property <color> surface: #FFFFFF;
-    out property <color> header: #FAFAFA;
-    out property <color> field: #FAFAFA;
-    out property <color> table-header: #FAFAFA;
-    out property <color> summary: #F7F7F8;
-    out property <color> border: #E5E5E7;
-    out property <color> card-border: #EDEDEF;
-    out property <color> field-border: #DFDFE2;
-    out property <color> header-border: #EDEDEF;
-    out property <color> field-border-hover: #C7C7CB;
-    out property <color> guide: #DCDCDF;
-    out property <color> row-hover: #F6F6F7;
-    out property <color> row-selected: #F0F0F1;
-    out property <color> scroll-track: #EFEFF1;
-    out property <color> scroll-thumb: #C9C9CD;
-    out property <color> scroll-thumb-hover: #ACACB1;
-    out property <color> scroll-thumb-pressed: #8E8E94;
-    out property <color> window-border: #D9D9DC;
-    out property <color> card-shadow: #0000000A;
+    out property <color> surface: root.dark-theme ? #18191D : #FFFFFF;
+    out property <color> header: root.dark-theme ? #1E2025 : #FAFAFA;
+    out property <color> field: root.dark-theme ? #24262C : #FAFAFA;
+    out property <color> table-header: root.dark-theme ? #1E2025 : #FAFAFA;
+    out property <color> summary: root.dark-theme ? #1E2025 : #F7F7F8;
+    out property <color> border: root.dark-theme ? #373A43 : #E5E5E7;
+    out property <color> card-border: root.dark-theme ? #373A43 : #EDEDEF;
+    out property <color> field-border: root.dark-theme ? #444852 : #DFDFE2;
+    out property <color> header-border: root.dark-theme ? #373A43 : #EDEDEF;
+    out property <color> field-border-hover: root.dark-theme ? #656B78 : #C7C7CB;
+    out property <color> guide: root.dark-theme ? #454852 : #DCDCDF;
+    out property <color> row-hover: root.dark-theme ? #22242A : #F6F6F7;
+    out property <color> row-selected: root.dark-theme ? #2A2D34 : #F0F0F1;
+    out property <color> scroll-track: root.dark-theme ? #24262C : #EFEFF1;
+    out property <color> scroll-thumb: root.dark-theme ? #555A65 : #C9C9CD;
+    out property <color> scroll-thumb-hover: root.dark-theme ? #6B717E : #ACACB1;
+    out property <color> scroll-thumb-pressed: root.dark-theme ? #808794 : #8E8E94;
+    out property <color> window-border: root.dark-theme ? #373A43 : #D9D9DC;
+    out property <color> card-shadow: root.dark-theme ? #00000040 : #0000000A;
 
     // Text and icons
-    out property <color> ink: #27272A;
-    out property <color> ink-soft: #3A3A3E;
-    out property <color> ink-data: #424247;
-    out property <color> muted: #6B6B72;
-    out property <color> icon: #707077;
+    out property <color> ink: root.dark-theme ? #F3F4F6 : #27272A;
+    out property <color> ink-soft: root.dark-theme ? #D9DCE2 : #3A3A3E;
+    out property <color> ink-data: root.dark-theme ? #CDD1D9 : #424247;
+    out property <color> muted: root.dark-theme ? #A9ADB7 : #6B6B72;
+    out property <color> icon: root.dark-theme ? #A9ADB7 : #707077;
+    out property <color> folder-icon-tint: root.dark-theme ? #A9ADB7 : transparent;
 
-    // Accent
-    out property <color> accent: #333333;
-    out property <color> accent-hover: #444444;
-    out property <color> accent-pressed: #222222;
-    out property <color> accent-disabled: #C4C4C8;
-    out property <color> accent-fill: #EBEBED;
-    out property <brush> logo: @linear-gradient(135deg, #4A4A4A 0%, #222222 100%);
-    out property <color> logo-shadow: #33333333;
+    // Primary and secondary actions
+    out property <color> accent: root.dark-theme ? #F3F4F6 : #333333;
+    out property <color> accent-hover: root.dark-theme ? #FFFFFF : #444444;
+    out property <color> accent-pressed: root.dark-theme ? #D9DCE2 : #222222;
+    out property <color> accent-disabled: root.dark-theme ? #353840 : #C4C4C8;
+    out property <color> accent-foreground: root.dark-theme ? #18191D : #FFFFFF;
+    out property <color> accent-disabled-foreground: root.dark-theme ? #A9ADB7 : #FFFFFF;
+    out property <color> accent-progress-overlay: root.dark-theme ? #18191D24 : #FFFFFF2E;
+    out property <color> accent-fill: root.dark-theme ? #30333B : #EBEBED;
+    out property <brush> logo: root.dark-theme
+        ? @linear-gradient(135deg, #656870 0%, #303239 100%)
+        : @linear-gradient(135deg, #4A4A4A 0%, #222222 100%);
+    out property <color> logo-shadow: root.dark-theme ? #00000066 : #33333333;
 
     // File status
-    out property <color> new-dot: #1E9E55;
-    out property <color> new-text: #18924A;
-    out property <color> new-fill: #DEF4E7;
-    out property <color> changed-dot: #DF8E10;
-    out property <color> changed-text: #C8770A;
-    out property <color> changed-fill: #FDF0DC;
-    out property <color> unchanged-dot: #A6B0C7;
-    out property <color> unchanged-pill-dot: #6B7390;
-    out property <color> unchanged-text: #535F80;
-    out property <color> unchanged-fill: #ECEEF3;
+    out property <color> new-dot: root.dark-theme ? #46C47A : #1E9E55;
+    out property <color> new-text: root.dark-theme ? #63D491 : #18924A;
+    out property <color> new-fill: root.dark-theme ? #1D3A2A : #DEF4E7;
+    out property <color> changed-dot: root.dark-theme ? #F0AD42 : #DF8E10;
+    out property <color> changed-text: root.dark-theme ? #F4BD63 : #C8770A;
+    out property <color> changed-fill: root.dark-theme ? #45331B : #FDF0DC;
+    out property <color> unchanged-dot: root.dark-theme ? #7E879C : #A6B0C7;
+    out property <color> unchanged-pill-dot: root.dark-theme ? #B1B8C7 : #6B7390;
+    out property <color> unchanged-text: root.dark-theme ? #C4CBD8 : #535F80;
+    out property <color> unchanged-fill: root.dark-theme ? #30343D : #ECEEF3;
 
     // Summary badges
-    out property <color> neutral-fill: #EDEDEF;
-    out property <color> neutral-icon: #3A3A3E;
+    out property <color> neutral-fill: root.dark-theme ? #30333B : #EDEDEF;
+    out property <color> neutral-icon: root.dark-theme ? #D9DCE2 : #3A3A3E;
 
     // Window controls
-    out property <color> control-hover: #EDEDEF;
-    out property <color> control-pressed: #E2E2E5;
-    out property <color> close-hover: #3A3A3E;
-    out property <color> close-pressed: #27272A;
+    out property <color> control-hover: root.dark-theme ? #2B2E35 : #EDEDEF;
+    out property <color> control-pressed: root.dark-theme ? #353840 : #E2E2E5;
+    out property <color> close-hover: root.dark-theme ? #50545F : #3A3A3E;
+    out property <color> close-pressed: root.dark-theme ? #3C4049 : #27272A;
 }

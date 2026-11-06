@@ -1,4 +1,4 @@
-folder, folder-filled, chevron-*, chevrons-up-down, file, file-text and refresh
+folder, folder-filled, chevron-*, chevrons-up-down, file, file-text, refresh, moon and sun
 are derived from Lucide icons (https://lucide.dev).
 
 ISC License
